@@ -6,6 +6,7 @@
 #include "../System/Utility/Calc.h"
 #include "ScreenData.h"
 #include "Renderer.h"
+#include "VoxelMaterial.h"
 
 /*
     Utility functions for the Renderer
@@ -19,18 +20,18 @@ class Util{
                 we are going to bound the depth range to 0-255 (anything greater will be interpreted as 255)
             */
     
-            return colour.r;
+           // scaling by 5 for visable results
+            return colour.r / 5.0f;
         }
 
         static sf::Color ColourFromDepth(sf::Uint32 depth){
-            return sf::Color(depth, depth, depth);
+            return sf::Color(depth * 5, depth * 5, depth * 5);
         }
 
         /*
-            @returns true if a voxel should have its sides rendered
+            @returns true if a tile should have its sides rendered
         */
         static bool TileSurrounding(int x, int y, FaceDirection direction, const ScreenData& screen_data, int tile_layer_index){
-
 
             switch(direction){
                 case FACE_TOP:
@@ -81,6 +82,61 @@ class Util{
 
         }
 
+        static bool VoxelSurrounding(int x, int y, int z, FaceDirection direction, const ScreenData& screen_data){
+
+            switch(direction){
+                case FACE_TOP:
+                    y--;
+                    // cull top 
+                    if(y < screen_data.m_half_canvas_height){
+                        return true;
+                    }
+                    break;
+
+                case FACE_LEFT:
+                    x--;
+                    // cull left 
+                    if(x < screen_data.m_half_canvas_width){
+                        return true;
+                    }
+                    break;
+
+                case FACE_BOTTOM:
+                    y++;
+
+                    // cull left 
+                    if(y > screen_data.m_half_canvas_height){
+                        return true;
+                    }
+                    break;
+                
+                case FACE_RIGHT:
+
+                    x++;
+                    // cull left 
+                    if(x > screen_data.m_half_canvas_width){
+                        return true;
+                    }
+                    break;    
+            }
+
+            // out of bounds
+            if(x >= screen_data.m_canvas_width || x < 0){
+                return true;
+            }
+            if(y >= screen_data.m_canvas_height || y < 0){
+                return true;
+            }
+
+
+            if(screen_data.m_voxel_space[z][x][y].occupied && screen_data.m_voxel_space[z][x][y].draw_sides){
+                return true;
+            }
+            else{
+                return false;
+            }
+        }
+
 
         static sf::Uint32 ConvertNormalColourToLightValue(ScreenData& screen_data, const sf::Color& normal_colour){
 
@@ -119,11 +175,22 @@ class Util{
         /*
             projects a 2D position into 3D space 
         */
-        static sf::Vector2f ShiftVertexOnPerspectiveAxis(sf::Vector2f position, const ScreenData& screen_data, float z_position){
+        static sf::Vector2f ShiftVertexOnPerspectiveAxis(sf::Vector2f position, const ScreenData& screen_data, float z_position, bool _floor = true){
             
             float distance = Calc::Distance(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height));
             sf::Vector2f shift = Calc::VectorBetween(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height)) * distance * z_position;
-            return  position + shift;
+
+            sf::Vector2f final = position + shift;
+
+            if(_floor){
+                final = sf::Vector2f(floor(final.x), floor(final.y));
+            }
+            else{
+                final = sf::Vector2f(ceil(final.x), ceil(final.y));
+            }
+
+            return final;
+
         }
 
         static sf::Vector3f NormalFromFace(const Face& face){
@@ -151,23 +218,23 @@ class Util{
         */
         static bool PositionIsInsideVoxel(ScreenData& screen_data, sf::Vector3f position){
 
-            int tile_map_width = screen_data.m_tile_layers[0].size();
-            int tile_map_height = screen_data.m_tile_layers[0][0].size();
-
-            int start_x = Calc::Clamp(floor(position.x / screen_data.m_tile_size), 0, tile_map_width);
-            int start_y = Calc::Clamp(floor(position.y / screen_data.m_tile_size), 0, tile_map_height);
+            int thresh_x = floor(position.x);
+            int thresh_y = floor(position.y);
+            int thresh_z = floor(position.z);
 
 
-            for(int i = screen_data.m_tile_layers.size() - 1; i >= 0; i--){
+            for(unsigned int z = Calc::Clamp(thresh_z - 1, 0, screen_data.m_voxel_space.size() - 1); z < Calc::Clamp(thresh_z + 1, 0, screen_data.m_voxel_space.size()); z++){
+                for(unsigned int x = Calc::Clamp(thresh_x - 1, 0, screen_data.m_canvas_width - 1); x < Calc::Clamp(thresh_x + 1, 0, screen_data.m_canvas_width); x++){
+                    for(unsigned int y = Calc::Clamp(thresh_y - 1, 0, screen_data.m_canvas_height - 1); y < Calc::Clamp(thresh_y + 1, 0, screen_data.m_canvas_height); y++){
 
-                for(unsigned int x = start_x; x < start_x + 1; x++){
-                    for(unsigned int y = start_y; y < start_y + 1; y++){
 
-                        if(screen_data.m_tile_layers[i][x][y].occupied){
+                        // black is no voxel
+                        if(screen_data.m_voxel_space[z][x][y].occupied){
+
                             // does position fall in voxel
-                            if(screen_data.m_tile_size * x < position.x && screen_data.m_tile_size * (x + 1) > position.x){
-                                if(screen_data.m_tile_size * y < position.y && screen_data.m_tile_size * (y + 1) > position.y){
-                                    if(screen_data.m_tile_depth * i < position.z && screen_data.m_tile_depth * (i + 1) > position.z){
+                            if(x <= position.x && (x + 1) >= position.x){
+                                if(y <= position.y && (y + 1) >= position.y){
+                                    if(z <= position.z && (z + 1) >= position.z){
 
                                         return true;
                                     }
@@ -177,12 +244,15 @@ class Util{
 
                     }
                 }
+                
             }
             return false;
 
         }
 
         /*
+            DEPRECATED: Should used sf::Image instead of sf::Texture
+
             wraps a position around a textures dimensions
             @param edge_overflows determines what happens if a position is equal to the edge of a texture
 
@@ -209,12 +279,59 @@ class Util{
 
             return new_position;
         }
+        static sf::Vector2i PositionToTexturePosition(sf::Vector2i position, const sf::Image& texture, bool edge_overflows_x, bool edge_overflows_y){
+            
+            sf::Vector2i new_position;
 
+            new_position.x = position.x % texture.getSize().x;
+            new_position.y = position.y % texture.getSize().y;
+
+
+            if(position.x % texture.getSize().x == 0){
+                new_position.x = 0;//texture.getSize().x;
+            }
+            if(position.y % texture.getSize().y == 0){
+                new_position.y = 0;//texture.getSize().y;
+            }
+
+            return new_position;
+        }
         // @returns a colour from a hand picked pool of random colours
         static sf::Color GetColourFromColourLoop(int index){
 
             index %= colour_loop.size();
             return colour_loop[index];
+        }
+
+        /*
+            @returns true if a voxel material has enough space to be placed
+        */
+        static bool ValidateVoxelMaterialFitsTileGrid(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer, const VoxelMaterial& voxel_material){
+
+            for(int x = 0; x < voxel_material.tile_width; x++){
+
+                // out of tilemap bounds
+                if(tile_x + x > screen_data.m_tile_layers[tile_layer].size()){
+                    return false;
+                }
+
+                for(int y = 0; y < voxel_material.tile_height; y++){
+
+                    // out of tilemap bounds
+                    if(tile_y + y > screen_data.m_tile_layers[tile_layer][0].size()){
+                        return false;
+                    }
+
+                    // no tile in place
+                    if(!screen_data.m_tile_layers[tile_layer][tile_x + x][tile_y + y].occupied){
+                        return false;
+                    }
+
+                }
+
+            }
+            // passed
+            return true;
         }
 
     private:

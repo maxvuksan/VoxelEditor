@@ -14,6 +14,7 @@ class Editor : public Core {
     enum TileMode{
         Tiles, // shows coloured placeholders
         Material,
+        Rope,
         Voxel, // shows generated voxel geometry
         NUMBER_OF_VIEWMODES,
     };
@@ -41,9 +42,15 @@ class Editor : public Core {
         // for TileMode == Material
         void DrawMaterialGuides(sf::RenderTarget& surface);
 
+        void DrawRopeGuides(sf::RenderTarget& surface);
+
+        void SetVoxelMaterial(int x, int y);
+        void SetTileMaterial(int x, int y);
+
         void MouseHandling();
 
         void CreateRect(bool remove);
+
 
         void CatchEvent(const sf::Event& event) override;
 
@@ -53,8 +60,10 @@ class Editor : public Core {
         sf::Vector2f m_mouse_position;
         sf::Vector2f m_mouse_position_inital; 
 
-        sf::Vector2i m_canvas_coordinate;
-        sf::Vector2i m_canvas_coordinate_inital;
+        sf::Vector2i m_tile_coord;
+        sf::Vector2i m_tile_coord_inital;
+
+        sf::Vector2f m_canvas_coordinate;
 
         bool m_drawing_place_rect;
         bool m_drawing_remove_rect;
@@ -64,14 +73,17 @@ class Editor : public Core {
         //ubScreen m_current_screen;
 
         // used for tile_material selection
-        int selected_index = 0;
+        int selected_tile_material = 0;
+        int selected_voxel_material = 0;
+        bool looking_at_voxel_materials = false;
+
+        BezierCurve* rope_being_created = nullptr;
+        bool moving_rope = false;
 
         int m_current_tile_layer;
 
         sf::Text m_text;
         sf::Font m_font;
-
-        sf::Texture tile_texture;
 
         sf::RectangleShape cursor_outline;
         sf::RectangleShape canvas_outline;

@@ -6,11 +6,32 @@
 #include "../System/include.h"
 
 #include "Rect.h"
+#include "BezierCurve.h"
 #include "TileMaterial.h"
 
 struct TileData{
     bool occupied = false;
     int tile_material_index = 0;
+
+    int voxel_material_index = -1; // no voxel material by default
+
+    /*
+        when a voxel material is placed, we only care about the top left tile, 
+        all others are not drawn to make way for this top left tile,
+    
+        so... if (voxel_material_index != -1 && !is_top_left_of_voxel_material){
+            do not draw tile
+        }
+    */
+    int is_topleft_of_voxel_material = false; 
+};
+
+struct VoxelData{
+
+    bool occupied = false;
+    sf::Color normal_colour = sf::Color::Black; // normal vector as colour
+    bool draw_sides = true; // if false, the voxel only has its front face drawn (essentially as a 2d plane)
+
 };
 
 
@@ -30,7 +51,7 @@ class ScreenData {
         // for anything that wont show up in final scene (UI helpers etc...)
         sf::RenderTexture m_general_surface;
 
-        sf::Vector3f m_flat_light_direction = sf::Vector3f(0.5,2.0,3.0);
+        sf::Vector3f m_flat_light_direction = sf::Vector3f(0.5,2.0,2.0);
         sf::Uint32 m_shadow_lift = 0;
 
         int m_tile_size;
@@ -48,7 +69,11 @@ class ScreenData {
 
         std::vector< std::vector<std::vector<TileData>> > m_tile_layers; // the closest to the camera
 
-        std::vector<Rect> m_rectangles;
+        std::vector<std::vector<std::vector<VoxelData>>> m_voxel_space;
+
+
+        // each vector represents a different tile_layer
+        std::vector<std::vector<BezierCurve>> m_ropes;
 
 
 
@@ -99,7 +124,18 @@ class ScreenData {
             m_canvas_shadow_map.create(m_canvas_width, m_canvas_height);
             m_canvas_depth.create(m_canvas_width, m_canvas_height);
 
+            m_voxel_space.resize(tile_depth * m_tile_layers.size());
+            for(int i = 0; i < tile_depth * m_tile_layers.size(); i++){
+
+                m_voxel_space[i].resize(m_canvas_width);
+                for(int x = 0; x < m_canvas_width; x++){
+                    m_voxel_space[i][x].resize(m_canvas_height);
+                }
+            }
+
             m_flat_light_direction = Calc::Normalize(m_flat_light_direction);
+
+            m_ropes.resize(m_tile_layers.size());
         }
 
 

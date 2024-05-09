@@ -35,6 +35,15 @@ class Renderer {
 
         static void Init();
 
+        static void ClearVoxels(ScreenData& screen_data);
+        static void CreateVoxelsFromScreenData(ScreenData& screen_data);
+        static void CreateVoxelFromTile(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer);
+        static void CreateVoxelFromVoxelMaterial(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer);
+        static void CreateVoxelsFromRopes(ScreenData& screen_data);
+
+        static void DrawVoxelLayer(ScreenData& screen_data, int z_position, sf::RenderTarget& surface, DrawMode draw_mode = NORMALS);
+
+
         static void DrawScreenData(ScreenData& screen_data, sf::RenderTarget& surface);
         static void DrawTileLayer(int tile_layer_index, ScreenData& screen_data, sf::RenderTarget& surface, DrawMode draw_mode = NORMALS);
         
@@ -49,7 +58,7 @@ class Renderer {
 
     private:
 
-
+        
         static sf::Image m_spare_image;
         static NormalPreset m_normal_dictionary[NUMBER_OF_FACES];
 

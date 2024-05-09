@@ -13,11 +13,10 @@ void Editor::Start(){
 
     m_camera.m_perspective_factor = 0.1;
 
-    tile_texture.loadFromFile("Assets/test_tile.png");
 
     m_window.setMouseCursorVisible(false);
 
-    m_screen_data.Create(40, 26, 32, 64);
+    m_screen_data.Create(40, 26, 16, 10);
 
     canvas_outline.setOutlineColor(sf::Color::White);
     canvas_outline.setOutlineThickness(1);
@@ -37,7 +36,7 @@ void Editor::Start(){
 
 
     Renderer::Init();
-    AssetManager::Init();
+    AssetManager::Init(m_screen_data);
 
 }
 
@@ -120,6 +119,9 @@ void Editor::DrawText(){
             case TileMode::Material:
                 m_text.setString("Material");
                 break;         
+            case TileMode::Rope:
+                m_text.setString("Rope");
+                break;           
             case TileMode::Voxel:
                 m_text.setString("Renderer");
                 break;           
@@ -141,17 +143,30 @@ void Editor::DrawText(){
 
     // draw tile material list
     if(m_view_mode == TileMode::Material){
-        m_text.setString("(E/D) Tile Material");
+        auto materials = AssetManager::GetAllTileMaterialNames();
+        
+        
+        if(looking_at_voxel_materials){
+            materials = AssetManager::GetAllVoxelMaterialNames();
+            m_text.setString("(E/D) Voxel Material");
+        }
+        else{
+            m_text.setString("(E/D) Tile Material");
+        }
         m_text.setPosition(sf::Vector2f(260, 32 ));
         m_window.draw(m_text);
 
-        auto tile_materials = AssetManager::GetAllTileMaterialNames();
+        m_text.setString("(Tab) Switch Material Mode");
+        m_text.setPosition(sf::Vector2f(260, 64 ));
+        m_window.draw(m_text);
 
-        for(int i = 0; i < tile_materials.size(); i++){
 
-            m_text.setString(tile_materials[i]);
 
-            if(i == selected_index){
+        for(int i = 0; i < materials.size(); i++){
+
+            m_text.setString(materials[i]);
+
+            if((i == selected_voxel_material && looking_at_voxel_materials) || (i == selected_tile_material && !looking_at_voxel_materials)){
                 m_text.setColor(sf::Color::Green);
 
             }
@@ -160,7 +175,7 @@ void Editor::DrawText(){
 
             }
 
-            m_text.setPosition(sf::Vector2f(260, 32 * (i + 2)));
+            m_text.setPosition(sf::Vector2f(260, 32 * (i + 4)));
 
             m_window.draw(m_text);
         }
@@ -222,6 +237,7 @@ void Editor::DrawTileGuides(sf::RenderTarget& surface){
                 tile_guides.append(vertex);
             }
         }
+        
         surface.draw(tile_guides);
     }
 
@@ -231,13 +247,14 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
 
     int quarter_tile_size = m_screen_data.m_tile_size / 4.0f;
 
+    auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+
     for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
 
         sf::VertexArray tile_guides;
         tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
         
         sf::Vertex vertex;
-
 
         for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
             for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
@@ -246,16 +263,17 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
                     continue;
                 }
 
+                float _x = x * m_screen_data.m_tile_size;
+                float _y = y * m_screen_data.m_tile_size;
+
                 // only show selected layer (to draw materials on)
                 if(i == m_current_tile_layer){
-                    vertex.color = sf::Color::Black;
+                    vertex.color = sf::Color(0,0,0,150);
                 }
                 else{
                     vertex.color = sf::Color(0,0,0,20);
                 }
 
-                float _x = x * m_screen_data.m_tile_size;
-                float _y = y * m_screen_data.m_tile_size;
 
                 // construct square for tile
                 vertex.position.x = _x;
@@ -274,34 +292,203 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
                 vertex.position.y = _y + m_screen_data.m_tile_size;
                 tile_guides.append(vertex);
 
+            }
+        }
+        
+        surface.draw(tile_guides);
+        tile_guides.clear();
+
+
+        for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
+            for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
+                
+                // is there a tile
+                if(!m_screen_data.m_tile_layers[i][x][y].occupied){
+                    continue;
+                }
+                // are we on the selected layer?
                 if(i != m_current_tile_layer){
                     continue;
                 }
+                // is part of a voxel material
+                if(m_screen_data.m_tile_layers[i][x][y].voxel_material_index != -1 && !m_screen_data.m_tile_layers[i][x][y].is_topleft_of_voxel_material){
+                    continue;
+                }
 
-                vertex.color = Util::GetColourFromColourLoop(m_screen_data.m_tile_layers[i][x][y].tile_material_index);
+                float _x = x * m_screen_data.m_tile_size;
+                float _y = y * m_screen_data.m_tile_size;
 
-                // construct square for material
-                vertex.position.x = _x + quarter_tile_size;
-                vertex.position.y = _y + quarter_tile_size;
-                tile_guides.append(vertex);
 
-                vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
-                vertex.position.y = _y + quarter_tile_size; 
-                tile_guides.append(vertex);
+                // no voxel
+                if(m_screen_data.m_tile_layers[i][x][y].voxel_material_index == -1){
 
-                vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
-                tile_guides.append(vertex);
+                    vertex.color = Util::GetColourFromColourLoop(m_screen_data.m_tile_layers[i][x][y].tile_material_index);
 
-                vertex.position.x = _x + quarter_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
-                tile_guides.append(vertex);
+                    // construct square for material
+                    vertex.position.x = _x + quarter_tile_size;
+                    vertex.position.y = _y + quarter_tile_size;
+                    tile_guides.append(vertex);
 
+                    vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
+                    vertex.position.y = _y + quarter_tile_size; 
+                    tile_guides.append(vertex);
+
+                    vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
+                    vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
+                    tile_guides.append(vertex);
+
+                    vertex.position.x = _x + quarter_tile_size;
+                    vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
+                    tile_guides.append(vertex);
+                }
+                // draw voxel sprite
+                else if(m_screen_data.m_tile_layers[i][x][y].is_topleft_of_voxel_material){
+                    voxel_materials[m_screen_data.m_tile_layers[i][x][y].voxel_material_index]->sprite_texture.setPosition(sf::Vector2f(_x, _y));
+                    surface.draw(voxel_materials[m_screen_data.m_tile_layers[i][x][y].voxel_material_index]->sprite_texture);
+                }
             }
         }
         surface.draw(tile_guides);
     }
 
+}
+
+void Editor::DrawRopeGuides(sf::RenderTarget& surface){
+
+    // move rope being created to mouse pos
+    if(rope_being_created != nullptr){
+        
+        rope_being_created->end = m_canvas_coordinate;
+        
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::E)){
+            rope_being_created->slack -= 1.3f;
+        }    
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D)){
+            rope_being_created->slack += 1.3f;
+        }
+    }
+
+    for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
+
+        sf::VertexArray tile_guides;
+        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
+        
+        sf::Vertex vertex;
+
+        for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
+            for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
+                
+                if(!m_screen_data.m_tile_layers[i][x][y].occupied){
+                    continue;
+                }
+
+                float _x = x * m_screen_data.m_tile_size;
+                float _y = y * m_screen_data.m_tile_size;
+
+                // only show selected layer (to draw materials on)
+                if(i == m_current_tile_layer){
+                    vertex.color = sf::Color(0,0,0,150);
+                }
+                else{
+                    vertex.color = sf::Color(0,0,0,20);
+                }
+
+
+                // construct square for tile
+                vertex.position.x = _x;
+                vertex.position.y = _y;
+                tile_guides.append(vertex);
+
+                vertex.position.x = _x + m_screen_data.m_tile_size;
+                vertex.position.y = _y; 
+                tile_guides.append(vertex);
+
+                vertex.position.x = _x + m_screen_data.m_tile_size;
+                vertex.position.y = _y + m_screen_data.m_tile_size;
+                tile_guides.append(vertex);
+
+                vertex.position.x = _x;
+                vertex.position.y = _y + m_screen_data.m_tile_size;
+                tile_guides.append(vertex);
+
+            }
+        }
+        
+        surface.draw(tile_guides);
+        tile_guides.clear();
+
+
+        sf::Vertex rope_vertex;
+        sf::VertexArray rope_vertex_array;
+        rope_vertex_array.setPrimitiveType(sf::PrimitiveType::Lines);
+
+        if(i == m_current_tile_layer){
+            rope_vertex.color = sf::Color::Yellow;
+        }
+        else{
+            rope_vertex.color = sf::Color(0,0,0,50);
+        }
+
+        for(auto& rope : m_screen_data.m_ropes[i]){
+
+            auto positions = rope.SamplePositions();
+
+            sf::Vector2f last_pos = rope.start;
+            for(auto& pos : positions){
+
+                rope_vertex.position = last_pos;
+                rope_vertex_array.append(rope_vertex);
+
+                rope_vertex.position = pos;
+                rope_vertex_array.append(rope_vertex);
+
+                last_pos = pos;
+            }
+        }
+        
+        surface.draw(rope_vertex_array);
+    }
+
+
+
+
+
+
+}
+
+void Editor::SetTileMaterial(int tile_x, int tile_y){
+
+    // remove exisiting voxel material if present
+    if(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].is_topleft_of_voxel_material){
+        
+        auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+        int voxel_material_index = m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].voxel_material_index;
+
+        for(int x = 0; x < voxel_materials[voxel_material_index]->tile_width; x++){
+            for(int y = 0; y < voxel_materials[voxel_material_index]->tile_height; y++){
+
+                m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + x].voxel_material_index = -1;
+                m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + y][tile_y + y].is_topleft_of_voxel_material = false;
+            }
+        }
+    }
+    // set tile
+    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].tile_material_index = selected_tile_material;
+}
+void Editor::SetVoxelMaterial(int tile_x, int tile_y){
+    
+    auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+
+    // mark each tile with appropriate voxel index
+    for(int x = 0; x < voxel_materials[selected_voxel_material]->tile_width; x++){
+        for(int y = 0; y < voxel_materials[selected_voxel_material]->tile_height; y++){
+            m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].voxel_material_index = selected_voxel_material;
+            m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].is_topleft_of_voxel_material = false;
+        }
+    }
+
+    // mark top corner as origin 
+    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].is_topleft_of_voxel_material = true;
 }
 
 void Editor::MouseHandling(){
@@ -326,33 +513,59 @@ void Editor::MouseHandling(){
 
 
 
-    sf::Vector2f canvas_coordinate = m_mouse_position - sf::Vector2f(m_window.getSize().x / 2.0f - m_screen_data.m_half_canvas_width,
+    m_canvas_coordinate = m_mouse_position - sf::Vector2f(m_window.getSize().x / 2.0f - m_screen_data.m_half_canvas_width,
                                                                                 m_window.getSize().y / 2.0f - m_screen_data.m_half_canvas_height);
 
-    m_canvas_coordinate = sf::Vector2i(round(canvas_coordinate.x / (float)m_screen_data.m_tile_size),
-                                                  round(canvas_coordinate.y / (float)m_screen_data.m_tile_size));
+    m_tile_coord = sf::Vector2i(round(m_canvas_coordinate.x / (float)m_screen_data.m_tile_size),
+                                                  round(m_canvas_coordinate.y / (float)m_screen_data.m_tile_size));
+
+
+
+    if(m_view_mode == TileMode::Material){
+        // draw voxel material UI visual at mouse
+        if(looking_at_voxel_materials){
+            auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+            voxel_materials[selected_voxel_material]->sprite_texture.setPosition(m_mouse_position);
+
+            m_window.draw(voxel_materials[selected_voxel_material]->sprite_texture);
+        }
+    }
+
+
+
 
 
     if(m_tile_tool == TileTool::BRUSH){
         // coordinate is within bounds
-        if(m_canvas_coordinate.x >= 0 && m_canvas_coordinate.x < m_screen_data.m_tile_layers[m_current_tile_layer].size()){
-            if(m_canvas_coordinate.y >= 0 && m_canvas_coordinate.y < m_screen_data.m_tile_layers[m_current_tile_layer][0].size()){
+        if(m_tile_coord.x >= 0 && m_tile_coord.x < m_screen_data.m_tile_layers[m_current_tile_layer].size()){
+            if(m_tile_coord.y >= 0 && m_tile_coord.y < m_screen_data.m_tile_layers[m_current_tile_layer][0].size()){
                 
                 // we are editing materials
                 if(m_view_mode == TileMode::Material){
-                    if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
-                        // set tile
-                        m_screen_data.m_tile_layers[m_current_tile_layer][m_canvas_coordinate.x][m_canvas_coordinate.y].tile_material_index = selected_index;
+
+                    if(looking_at_voxel_materials){
+                        auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+                        // drawing voxel
+                        if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && Util::ValidateVoxelMaterialFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, *voxel_materials[selected_voxel_material])){
+                            SetVoxelMaterial(m_tile_coord.x, m_tile_coord.y);
+                        }
                     }
+                
+                    else{
+                        if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
+                            SetTileMaterial(m_tile_coord.x, m_tile_coord.y);
+                        }
+                    }
+
                 }
-                else{ // we are editing tiles
+                else if(m_view_mode == TileMode::Tiles){ // we are editing tiles
                     if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
                         // set tile
-                        m_screen_data.m_tile_layers[m_current_tile_layer][m_canvas_coordinate.x][m_canvas_coordinate.y].occupied = true;
+                        m_screen_data.m_tile_layers[m_current_tile_layer][m_tile_coord.x][m_tile_coord.y].occupied = true;
                     }
                     else if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right)){
                         // remove tile
-                        m_screen_data.m_tile_layers[m_current_tile_layer][m_canvas_coordinate.x][m_canvas_coordinate.y].occupied = false;
+                        m_screen_data.m_tile_layers[m_current_tile_layer][m_tile_coord.x][m_tile_coord.y].occupied = false;
                     }
                 }
             }
@@ -362,8 +575,8 @@ void Editor::MouseHandling(){
 
 void Editor::CreateRect(bool remove){
 
-    sf::Vector2i start = m_canvas_coordinate_inital;
-    sf::Vector2i end = m_canvas_coordinate;
+    sf::Vector2i start = m_tile_coord_inital;
+    sf::Vector2i end = m_tile_coord;
 
     if(start.x > end.x){
         int temp = start.x;
@@ -387,10 +600,21 @@ void Editor::CreateRect(bool remove){
         if(remove){ // cannot remove materials
             return;
         }
+
+        auto voxel_materials = AssetManager::GetAllVoxelMaterials();
+
         for(int x = start.x; x < end.x; x++){
             for(int y = start.y; y < end.y; y++){
 
-                m_screen_data.m_tile_layers[m_current_tile_layer][x][y].tile_material_index = selected_index;
+                if(!looking_at_voxel_materials){
+
+                    SetTileMaterial(x, y);
+                }
+                // only allow rectangle tool on 1x1 voxel materials
+                else if(voxel_materials[selected_voxel_material]->tile_height == 1 && voxel_materials[selected_voxel_material]->tile_width == 1){
+                    SetVoxelMaterial(x, y);
+                }
+
             }
         }
     }
@@ -409,12 +633,21 @@ void Editor::Drawing(){
     m_window.clear(sf::Color(161, 163, 173));
     m_screen_data.m_general_surface.clear(sf::Color::Transparent);
 
-    if(m_view_mode == TileMode::Tiles){
-        DrawTileGuides(m_screen_data.m_general_surface);
+    switch(m_view_mode){
+
+        case TileMode::Tiles: {
+            DrawTileGuides(m_screen_data.m_general_surface);
+            break;
+        }
+        case TileMode::Material: {
+            DrawMaterialGuides(m_screen_data.m_general_surface);
+            break;
+        }
+        case TileMode::Rope: {
+            DrawRopeGuides(m_screen_data.m_general_surface);
+            break;
+        }
     }
-    else if(m_view_mode == TileMode::Material){
-        DrawMaterialGuides(m_screen_data.m_general_surface);
-    }   
 
     if(m_tile_tool == TileTool::BRUSH || (m_tile_tool == TileTool::RECTANGLE && !m_drawing_place_rect && !m_drawing_remove_rect) ){
         cursor_outline.setSize(sf::Vector2f(m_screen_data.m_tile_size, m_screen_data.m_tile_size));
@@ -452,7 +685,11 @@ void Editor::Drawing(){
     canvas_outline.setPosition(canvas_sprite.getPosition());
 
     if(m_view_mode == TileMode::Voxel){
+        canvas_sprite.setScale(sf::Vector2f(2.0f, 2.0f));
         m_window.draw(canvas_sprite);
+    }
+    else{
+        canvas_sprite.setScale(sf::Vector2f(1.0f, 1.0f));
     }
 
     // draw general surface
@@ -470,19 +707,41 @@ void Editor::Drawing(){
 
 void Editor::CatchEvent(const sf::Event& event){
 
-    if(m_tile_tool == TileTool::RECTANGLE){
+    if(m_view_mode == TileMode::Rope){
+        if(event.type == sf::Event::MouseButtonPressed){
+
+            if(event.mouseButton.button == sf::Mouse::Button::Left){
+
+                if(rope_being_created == nullptr){
+                    m_screen_data.m_ropes[m_current_tile_layer].push_back({m_canvas_coordinate, sf::Vector2f(0,0)});
+                    rope_being_created = &m_screen_data.m_ropes[m_current_tile_layer][m_screen_data.m_ropes[m_current_tile_layer].size() - 1];
+                }
+
+            }
+        }
+        if(event.type == sf::Event::MouseButtonReleased){
+
+            if(event.mouseButton.button == sf::Mouse::Button::Left){
+                
+                rope_being_created = nullptr;
+            }
+        }
+
+    }
+
+    else if(m_tile_tool == TileTool::RECTANGLE){
         if(event.type == sf::Event::MouseButtonPressed){
 
             if(event.mouseButton.button == sf::Mouse::Button::Left){
                 m_drawing_place_rect = true;
                 m_drawing_remove_rect = false;
-                m_canvas_coordinate_inital = m_canvas_coordinate;
+                m_tile_coord_inital = m_tile_coord;
                 m_mouse_position_inital = m_mouse_position;
             }
             else if(event.mouseButton.button == sf::Mouse::Button::Right){
                 m_drawing_remove_rect = true;
                 m_drawing_place_rect = false;
-                m_canvas_coordinate_inital = m_canvas_coordinate;
+                m_tile_coord_inital = m_tile_coord;
                 m_mouse_position_inital = m_mouse_position;
             }
         }
@@ -542,16 +801,37 @@ void Editor::CatchEvent(const sf::Event& event){
             m_tile_tool = TileTool::RECTANGLE;
         }
 
+        else if(event.key.scancode == sf::Keyboard::Scancode::Tab){
+            looking_at_voxel_materials = !looking_at_voxel_materials;
+        }
+
         if(event.key.scancode == sf::Keyboard::Scancode::E){
-            selected_index--;
-            if(selected_index < 0){
-                selected_index = AssetManager::GetAllTileMaterialNames().size() - 1;
+
+            if(looking_at_voxel_materials){
+                selected_voxel_material--;
+                if(selected_voxel_material < 0){
+                    selected_voxel_material = AssetManager::GetAllVoxelMaterialNames().size() - 1;
+                }
+            }
+            else{
+                selected_tile_material--;
+                if(selected_tile_material < 0){
+                    selected_tile_material = AssetManager::GetAllTileMaterialNames().size() - 1;
+                }
             }
         }
         if(event.key.scancode == sf::Keyboard::Scancode::D){
-            selected_index++;
-            if(selected_index >= AssetManager::GetAllTileMaterialNames().size()){
-                selected_index = 0;
+            if(looking_at_voxel_materials){
+                selected_voxel_material++;
+                if(selected_voxel_material >= AssetManager::GetAllVoxelMaterialNames().size()){
+                    selected_voxel_material = 0;
+                }
+            }
+            else{
+                selected_tile_material++;
+                if(selected_tile_material >= AssetManager::GetAllTileMaterialNames().size()){
+                    selected_tile_material = 0;
+                }
             }
             
         }
