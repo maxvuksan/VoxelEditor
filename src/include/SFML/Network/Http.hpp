@@ -471,11 +471,11 @@ private:
 /// sf::Http::Response::Status status = response.getStatus();
 /// if (status == sf::Http::Response::Ok)
 /// {
-///     std::cout << response.getBody() << std::endl;
+///     //std::cout << response.getBody() << std::endl;
 /// }
 /// else
 /// {
-///     std::cout << "Error " << status << std::endl;
+///     //std::cout << "Error " << status << std::endl;
 /// }
 /// \endcode
 ///

@@ -24,8 +24,8 @@ class Datafile{
         void SetReal(const double d, const size_t item_index = 0);
         const double GetReal(const size_t item_index = 0) const; 
 
-        void SetInt(const int32_t d, const size_t item_index = 0);
-        const int32_t GetInt(const size_t item_index = 0) const; 
+        void SetInt(const int d, const size_t item_index = 0);
+        const int GetInt(const size_t item_index = 0) const; 
 
         size_t GetValueCount() const{ return content.size();}
 

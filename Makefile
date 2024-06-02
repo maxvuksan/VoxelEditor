@@ -44,7 +44,7 @@ all: $(EXE_NAME)
 # work around
 
 compile:
-	g++ -o editor.exe -Isrc/include main.cpp $(EDITOR) $(SYSTEM) $(LIBS) 
+	g++ -g -o editor.exe -Isrc/include main.cpp $(EDITOR) $(SYSTEM) $(LIBS) 
 	./editor.exe
 
 

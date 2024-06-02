@@ -19,9 +19,9 @@ class Memory {
                 allocations++;
                 total_size += sizeof(*memory);
 
-                std::cout << "New   : " << sizeof(*memory) << " b : " << source << "\n";
-                std::cout << "Size  : " << total_size << " b\n";
-                std::cout << "Count : " << allocations << "\n";
+                //std::cout << "New   : " << sizeof(*memory) << " b : " << source << "\n";
+                //std::cout << "Size  : " << total_size << " b\n";
+                //std::cout << "Count : " << allocations << "\n";
             }
             */
 
@@ -37,9 +37,9 @@ class Memory {
                 allocations--;
                 total_size -= sizeof(*memory);
 
-                std::cout << "Delete : " << sizeof(*memory) << " b : " << source << "\n";
-                std::cout << "Size  : " << total_size << " b\n";
-                std::cout << "Count : " << allocations << "\n";
+                //std::cout << "Delete : " << sizeof(*memory) << " b : " << source << "\n";
+                //std::cout << "Size  : " << total_size << " b\n";
+                //std::cout << "Count : " << allocations << "\n";
             }
             */
 

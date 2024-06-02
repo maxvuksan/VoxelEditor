@@ -46,10 +46,10 @@ class Time {
         }
         /* ends a recording printing the elapsed time to std::out, should be started with Time::StartRecord() */
         static void EndRecord(){
-            std::cout << "Time::EndRecord(): " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - recording_start).count() << "ms\n";
+            //std::cout << "Time::EndRecord(): " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - recording_start).count() << "ms\n";
         }
         static void EndRecordNano(){
-            std::cout << "Time::EndRecord(): " << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - recording_start).count() << "ns\n";
+            //std::cout << "Time::EndRecord(): " << std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - recording_start).count() << "ns\n";
         }
 
 	private:

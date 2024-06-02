@@ -51,5 +51,7 @@ void Core::Run(){
         m_window.display();
         Time::Increment();
     }
+
+    Cleanup();
     
 }

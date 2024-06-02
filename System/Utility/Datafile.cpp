@@ -26,9 +26,9 @@ const double Datafile::GetReal(const size_t item_index) const{
     return std::atof(GetString(item_index).c_str());
 }
 
-void Datafile::SetInt(const int32_t i, const size_t item_index){
+void Datafile::SetInt(const int i, const size_t item_index){
     SetString(std::to_string(i), item_index);
 }
-const int32_t Datafile::GetInt(const size_t item_index) const{
+const int Datafile::GetInt(const size_t item_index) const{
     return std::atoi(GetString(item_index).c_str());
 }; 

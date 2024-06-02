@@ -6,14 +6,43 @@
 #include "../System/Utility/Calc.h"
 #include "ScreenData.h"
 #include "Renderer.h"
-#include "VoxelMaterial.h"
+#include "VoxelObject.h"
+#include "FaceDirection.h"
+
+
 
 /*
     Utility functions for the Renderer
 */
 class Util{
 
+
     public:
+
+        // @returns the position symmetric to the provided x position
+        static int GetSymmetricPositionX(ScreenData& screen_data, int x){
+            
+            // passed halfway
+            if(x >= screen_data.m_half_tile_width){
+                return screen_data.m_half_tile_width - (x - screen_data.m_half_tile_width) - 1;
+            }
+            else{
+                return screen_data.m_tile_layers[0].size() - x - 1;
+            }
+        }
+
+        // @returns the position symmetric to the provided x position
+        static int GetSymmetricPositionY(ScreenData& screen_data, int y){
+
+            // passed halfway
+            if(y >= screen_data.m_half_tile_height){
+                return screen_data.m_half_tile_height - (y - screen_data.m_half_tile_height) - 1;
+            }
+            else{
+                return screen_data.m_tile_layers[0][0].size() - y - 1;
+            }
+
+        }
 
         static sf::Uint32 DepthFromColour(sf::Color colour){
             /*
@@ -140,36 +169,41 @@ class Util{
 
         static sf::Uint32 ConvertNormalColourToLightValue(ScreenData& screen_data, const sf::Color& normal_colour){
 
-            float x = normal_colour.r / 255.0f;
-            float y = normal_colour.g / 255.0f;
-            float z = normal_colour.b / 255.0f;
+            if(normal_colour == sf::Color(127, 127, 255)){
+                return 205; // flat light value
+            }
+            if(normal_colour == sf::Color::Green){
+                return 255; // highlight colour
+            }
+            if(normal_colour == sf::Color::Blue){
+                return 150; // dark colour
+            }
 
-            x -= 0.5f;
-            y -= 0.5f;
-            z -= 0.5f;
-
-            sf::Vector3f normal_vector(x, y, z);
-            normal_vector = Calc::Normalize(normal_vector);
-
-            float dot_product = Calc::DotProduct(normal_vector, screen_data.m_flat_light_direction);
-            
-            dot_product += 0.5f;
-            dot_product *= 0.5f;
-
-            sf::Uint32 flat_light_value =  round(dot_product * 255);
-            return flat_light_value;
+            return 205;
         }
 
 
-        static sf::Color ColourFromNormal(sf::Vector3f normal){
+        static sf::Color ColourFromNormal(FaceDirection face_direction){
 
-            normal.x += 1.0f;
-            normal.y += 1.0f;
-            normal.z += 1.0f;
+            switch(face_direction){
 
-            normal /= 2.0f;
+                case FACE_FRONT: 
+                    return sf::Color(127, 127, 255);
+                    break;
+                
+                case FACE_TOP:
+                case FACE_LEFT: 
+                    return sf::Color::Green;
+                    break;
 
-            return sf::Color(normal.x * 255, normal.y * 255, normal.z * 255);
+                case FACE_RIGHT:
+                case FACE_BOTTOM: 
+                    return sf::Color::Blue;
+                    break;               
+
+            }
+            // spit out flat colour on bad input
+            return sf::Color(127, 127, 255);
         }
 
         /*
@@ -305,25 +339,27 @@ class Util{
 
         /*
             @returns true if a voxel material has enough space to be placed
-        */
-        static bool ValidateVoxelMaterialFitsTileGrid(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer, const VoxelMaterial& voxel_material){
 
-            for(int x = 0; x < voxel_material.tile_width; x++){
+            @param check_surrounding_tiles if false, a object is always valid when in the bounds of the tile space
+        */
+        static bool ValidateVoxelObjectFitsTileGrid(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer, int object_width, int object_height, bool check_surrounding_tiles){
+
+            for(int x = 0; x < object_width; x++){
 
                 // out of tilemap bounds
-                if(tile_x + x > screen_data.m_tile_layers[tile_layer].size()){
+                if(tile_x + x >= screen_data.m_tile_layers[tile_layer].size()){
                     return false;
                 }
 
-                for(int y = 0; y < voxel_material.tile_height; y++){
+                for(int y = 0; y < object_height; y++){
 
                     // out of tilemap bounds
-                    if(tile_y + y > screen_data.m_tile_layers[tile_layer][0].size()){
+                    if(tile_y + y >= screen_data.m_tile_layers[tile_layer][0].size()){
                         return false;
                     }
 
                     // no tile in place
-                    if(!screen_data.m_tile_layers[tile_layer][tile_x + x][tile_y + y].occupied){
+                    if(!screen_data.m_tile_layers[tile_layer][tile_x + x][tile_y + y].occupied && check_surrounding_tiles){
                         return false;
                     }
 

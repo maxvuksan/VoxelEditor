@@ -18,6 +18,7 @@ class Core{
 
         // starts the program, i.e begins the game loop
         void Run();
+        virtual void Cleanup(){}
 
         // is called directly after Run()
         virtual void Start(){}

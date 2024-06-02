@@ -266,7 +266,7 @@ private:
 /// sf::IpAddress sender;
 /// unsigned short port;
 /// socket.receive(buffer, sizeof(buffer), received, sender, port);
-/// std::cout << sender.ToString() << " said: " << buffer << std::endl;
+/// //std::cout << sender.ToString() << " said: " << buffer << std::endl;
 ///
 /// // ----- The server -----
 ///
@@ -280,7 +280,7 @@ private:
 /// sf::IpAddress sender;
 /// unsigned short port;
 /// socket.receive(buffer, sizeof(buffer), received, sender, port);
-/// std::cout << sender.ToString() << " said: " << buffer << std::endl;
+/// //std::cout << sender.ToString() << " said: " << buffer << std::endl;
 ///
 /// // Send an answer
 /// std::string message = "Welcome " + sender.toString();

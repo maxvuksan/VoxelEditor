@@ -287,7 +287,7 @@ private:
 /// char buffer[1024];
 /// std::size_t received = 0;
 /// socket.receive(buffer, sizeof(buffer), received);
-/// std::cout << "The server said: " << buffer << std::endl;
+/// //std::cout << "The server said: " << buffer << std::endl;
 ///
 /// // ----- The server -----
 ///
@@ -298,13 +298,13 @@ private:
 /// // Wait for a connection
 /// sf::TcpSocket socket;
 /// listener.accept(socket);
-/// std::cout << "New client connected: " << socket.getRemoteAddress() << std::endl;
+/// //std::cout << "New client connected: " << socket.getRemoteAddress() << std::endl;
 ///
 /// // Receive a message from the client
 /// char buffer[1024];
 /// std::size_t received = 0;
 /// socket.receive(buffer, sizeof(buffer), received);
-/// std::cout << "The client said: " << buffer << std::endl;
+/// //std::cout << "The client said: " << buffer << std::endl;
 ///
 /// // Send an answer
 /// std::string message = "Welcome, client";
