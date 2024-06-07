@@ -72,6 +72,7 @@ void Editor::Start(){
     selected_palette = 0;
 
     palette_preview = false;
+    viewing_generation_stack = false;
     m_material_select_type = MaterialSelectionType::TILE_MATERIALS;
 
     Renderer::Init();
@@ -84,6 +85,15 @@ void Editor::Start(){
 
 void Editor::Cleanup(){
     AssetManager::Destruct();
+
+    // clear heap allocated generation canvas
+    for(int i = 0; i < m_screen_data.m_generation_canvas.size(); i++){
+        
+        delete m_screen_data.m_generation_canvas[i].m_tile_layer_images[0];
+        delete m_screen_data.m_generation_canvas[i].m_tile_layer_images[1];
+        delete m_screen_data.m_generation_canvas[i].m_tile_layer_images[2];
+    }
+    m_screen_data.m_generation_canvas.clear();
 }
 
 void Editor::Update(){
@@ -315,6 +325,100 @@ void Editor::DrawEditorText(){
             m_screen_data.m_ropes[m_current_tile_layer].clear();
         }
     }
+
+            // draw tile material list
+    if(m_view_mode == TileMode::Generation){
+
+
+        // show effect stack
+        if(viewing_generation_stack){
+
+            m_text.setString("(Tab) View Effects List");
+            m_text.setPosition(sf::Vector2f(360, 32 ));
+            m_window.draw(m_text);
+
+            m_text.setString("(E/D) Cycle Effects");
+            m_text.setPosition(sf::Vector2f(360, 64 ));
+            m_window.draw(m_text);
+
+            m_text.setString("(LShift + E/D) Reorder");
+            m_text.setPosition(sf::Vector2f(360, 32 * 3 ));
+            m_window.draw(m_text);
+
+            m_text.setString("(Del) Delete Effect");
+            m_text.setPosition(sf::Vector2f(360, 32 * 4 ));
+            m_window.draw(m_text);
+
+
+            m_text.setString("Applied FIRST -> LAST");
+            m_text.setPosition(sf::Vector2f(360, 32 * 6 ));
+            m_window.draw(m_text);    
+            m_text.setColor(sf::Color(49, 71, 107));
+            m_text.setString("[ FIRST ]");
+            m_text.setPosition(sf::Vector2f(360, 32 * 7 ));
+            m_window.draw(m_text);     
+
+            int i;
+            for(i = 0; i < m_screen_data.m_generation_canvas.size(); i++){
+
+                // get name of enum
+                m_text.setString(AssetManager::GetGenerationEffects()[m_screen_data.m_generation_canvas[i].m_type].name);
+
+                if(i == selected_generation_stack_item){
+                    m_text.setColor(sf::Color::Green);
+                }
+                else{
+                    m_text.setColor(sf::Color::White);
+
+                }
+
+                m_text.setPosition(sf::Vector2f(360, 32 * (i + 8)));
+                m_window.draw(m_text);
+            }
+
+            m_text.setColor(sf::Color(49, 71, 107));
+            m_text.setString("[ LAST ]");
+            m_text.setPosition(sf::Vector2f(360, 32 * (i + 8)));
+            m_window.draw(m_text);     
+
+        }
+        else{
+
+            m_text.setString("(Tab) View Effect Stack");
+            m_text.setPosition(sf::Vector2f(260, 32 ));
+            m_window.draw(m_text);
+
+            m_text.setString("(E/D) Cycle Effects");
+            m_text.setPosition(sf::Vector2f(260, 64 ));
+            m_window.draw(m_text);
+
+            m_text.setString("(Enter) Append Effect to Stack");
+            m_text.setPosition(sf::Vector2f(260, 32 * 3 ));
+            m_window.draw(m_text);
+
+
+            for(int i = 0; i < AssetManager::GetGenerationEffects().size(); i++){
+
+                // get name of enum
+                m_text.setString(AssetManager::GetGenerationEffects()[i].name);
+
+                if(i == selected_generation){
+                    m_text.setColor(sf::Color::Green);
+                }
+                else{
+                    m_text.setColor(sf::Color::White);
+
+                }
+
+                m_text.setPosition(sf::Vector2f(260, 32 * (i + 5)));
+                m_window.draw(m_text);
+            }
+        }
+
+    }
+
+
+
 
     if(m_view_mode == TileMode::Lightmap){
         m_text.setString("(C) Clear Lightmap");
@@ -881,14 +985,20 @@ void Editor::DrawGenerationGuides(sf::RenderTarget& surface){
         tile_guides.clear();
     }
 
-    sf::Texture focused_generation_map;
-    focused_generation_map.loadFromImage(m_screen_data.m_generation_canvas[0][m_current_tile_layer]);
+    if(viewing_generation_stack && selected_generation_stack_item >= 0 && selected_generation_stack_item < m_screen_data.m_generation_canvas.size()){
+        sf::Texture focused_generation_map;
+        focused_generation_map.loadFromImage(*m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]);
 
-    // draw generation maps
-    surface.draw(sf::Sprite(focused_generation_map));
+        // draw generation maps
+        surface.draw(sf::Sprite(focused_generation_map));
+    }
 }
 
 void Editor::PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, int brush_size){
+
+    if(selected_generation_stack_item < 0 || selected_generation_stack_item >= m_screen_data.m_generation_canvas.size()){
+        return;
+    }
 
     brush_size = Calc::Clamp(brush_size - 1, 0, 999);
 
@@ -922,7 +1032,9 @@ void Editor::PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, 
 
             m_screen_data.m_generation_canvas[0][m_current_tile_layer].setPixel(real_x, real_y, sf::Color(new_amount, 0, 0, m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(real_x, real_y).a));
             */
-           m_screen_data.m_generation_canvas[0][m_current_tile_layer].setPixel(real_x, real_y, sf::Color(amount, 0, 0, m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(real_x, real_y).a));
+           m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->setPixel(
+            real_x, real_y, sf::Color(amount, 0, 0, 
+            m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(real_x, real_y).a));
         }
     }
 
@@ -967,11 +1079,11 @@ void Editor::AverageInbetweenGenerationPoints(int min_x, int max_x, int min_y, i
                 ceil_y = m_screen_data.m_canvas_height - 1;
             }
 
-            sf::Uint8 top_floor_col = m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(floor_x, floor_y).r;
-            sf::Uint8 top_ceil_col = m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(ceil_x, floor_y).r;
+            sf::Uint8 top_floor_col = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(floor_x, floor_y).r;
+            sf::Uint8 top_ceil_col = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(ceil_x, floor_y).r;
             
-            sf::Uint8 bot_floor_col = m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(floor_x, ceil_y).r;
-            sf::Uint8 bot_ceil_col = m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(ceil_x, ceil_y).r;
+            sf::Uint8 bot_floor_col = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(floor_x, ceil_y).r;
+            sf::Uint8 bot_ceil_col = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(ceil_x, ceil_y).r;
 
             
             sf::Uint8 final_col = Calc::Lerp(
@@ -980,9 +1092,9 @@ void Editor::AverageInbetweenGenerationPoints(int min_x, int max_x, int min_y, i
                 (y - floor_y) / (float)m_screen_data.m_tile_size);
                 
 
-            m_screen_data.m_generation_canvas[0][m_current_tile_layer].setPixel(x, y, 
+            m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->setPixel(x, y, 
                         sf::Color(final_col, 0, 0, 
-                                                m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(x,y).a));
+                                                m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(x,y).a));
 
 
         }
@@ -1522,7 +1634,7 @@ void Editor::CatchEvent(const sf::Event& event){
 
     }
 
-    else if(m_tile_tool == TileTool::RECTANGLE && m_view_mode == TileMode::Tiles || m_view_mode == TileMode::Material){
+    else if(m_tile_tool == TileTool::RECTANGLE && (m_view_mode == TileMode::Tiles || m_view_mode == TileMode::Material)){
         if(event.type == sf::Event::MouseButtonPressed){
 
             if(event.mouseButton.button == sf::Mouse::Button::Left){
@@ -1560,7 +1672,6 @@ void Editor::CatchEvent(const sf::Event& event){
 
     if(event.type == sf::Event::KeyPressed){
 
-
         // switching view modes
         if(event.key.scancode == sf::Keyboard::Scancode::Up){
             m_view_mode--;
@@ -1575,7 +1686,7 @@ void Editor::CatchEvent(const sf::Event& event){
             else{
                 Renderer::StopRender();
             }
-            
+
         }
         if(event.key.scancode == sf::Keyboard::Scancode::Down){
             m_view_mode++;
@@ -1619,6 +1730,110 @@ void Editor::CatchEvent(const sf::Event& event){
         }
 
 
+        if(m_view_mode == TileMode::Generation){
+
+            if(event.key.scancode == sf::Keyboard::Scancode::Tab){
+                viewing_generation_stack = !viewing_generation_stack;
+            }
+
+
+            if(viewing_generation_stack){
+
+                if(event.key.scancode == sf::Keyboard::Scancode::Delete){
+
+                    if(selected_generation_stack_item < m_screen_data.m_generation_canvas.size()){
+
+                        int new_effect_index = m_screen_data.m_generation_canvas.size() - 1;
+
+                        // free memory of effect we are letting go 
+                        delete m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[0];
+                        delete m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[1];
+                        delete m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[2];
+
+                        // remove from effect stack
+                        m_screen_data.m_generation_canvas.erase(m_screen_data.m_generation_canvas.begin() + selected_generation_stack_item);
+                    
+                        if(m_screen_data.m_generation_canvas.size() == 0){
+                            viewing_generation_stack = false;
+                        }
+                    }
+                }
+
+                if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::LShift)){
+                    // selected our generative 
+
+                    if(event.key.scancode == sf::Keyboard::Scancode::E && selected_generation_stack_item > 0){
+                        std::swap(m_screen_data.m_generation_canvas[selected_generation_stack_item], m_screen_data.m_generation_canvas[selected_generation_stack_item - 1]);
+                        selected_generation_stack_item--;
+                    }
+                    if(event.key.scancode == sf::Keyboard::Scancode::D && selected_generation_stack_item < m_screen_data.m_generation_canvas.size() - 1){
+                        std::swap(m_screen_data.m_generation_canvas[selected_generation_stack_item], m_screen_data.m_generation_canvas[selected_generation_stack_item + 1]);
+                        selected_generation_stack_item++;
+
+                    }
+                }
+                else{
+                    // moving between the selected generation stack items,
+                    if(event.key.scancode == sf::Keyboard::Scancode::E){
+                        selected_generation_stack_item--;
+                    }
+                    if(event.key.scancode == sf::Keyboard::Scancode::D){
+                        selected_generation_stack_item++;
+                    }
+                }
+
+                if(selected_generation_stack_item >= m_screen_data.m_generation_canvas.size()){
+                    selected_generation_stack_item = 0;
+                }
+                if(selected_generation_stack_item < 0){
+                    selected_generation_stack_item = m_screen_data.m_generation_canvas.size() - 1;
+                }
+
+
+            }
+            else{
+
+                if(event.key.scancode == sf::Keyboard::Scancode::Enter){
+
+                    m_screen_data.m_generation_canvas.push_back({GenerationCanvas({(GenerationType)selected_generation, {}})});
+
+                    int new_effect_index = m_screen_data.m_generation_canvas.size() - 1;
+
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images.resize(3);
+
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[0] = new sf::Image;
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[1] = new sf::Image;
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[2] = new sf::Image;
+
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[0]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[1]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[2]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
+                
+                    selected_generation_stack_item = new_effect_index;
+                    viewing_generation_stack = true;
+                }
+
+                
+                // selected our generative 
+                if(event.key.scancode == sf::Keyboard::Scancode::E){
+                    selected_generation--;
+                }
+                if(event.key.scancode == sf::Keyboard::Scancode::D){
+                    selected_generation++;
+                }
+
+                if(selected_generation >= AssetManager::GetGenerationEffects().size()){
+                    selected_generation = 0;
+                }
+                if(selected_generation < 0){
+                    selected_generation = AssetManager::GetGenerationEffects().size() - 1;
+                }
+
+            }
+
+        }
+
+
         if(m_view_mode == TileMode::Lightmap){
 
             if(event.key.scancode == sf::Keyboard::Scancode::E){
@@ -1644,7 +1859,7 @@ void Editor::CatchEvent(const sf::Event& event){
             if(selected_lightmap >= AssetManager::GetLightShapes().size()){
                 selected_lightmap = 0;
             }
-            else if(selected_lightmap < 0){
+            if(selected_lightmap < 0){
                 selected_lightmap = AssetManager::GetLightShapes().size() - 1;
             }
 

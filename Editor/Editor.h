@@ -123,6 +123,10 @@ class Editor : public Core {
         // uses MaterialSelectionType enum
         int m_material_select_type;
 
+        int selected_generation = 0;
+        int selected_generation_stack_item = 0;
+        bool viewing_generation_stack; // are we selecting generation effects, or are we viewing the stack
+
         BezierCurve* rope_being_created = nullptr;
         BezierCurve* rope_being_moved = nullptr;
         sf::Vector2f* rope_position_being_moved;

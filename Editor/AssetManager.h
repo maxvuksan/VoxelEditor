@@ -5,6 +5,7 @@
 #include "TileObject.h"
 #include <map>
 #include <filesystem>
+#include "GenerationType.h"
 
 /*
     holds references to all our materials
@@ -18,6 +19,8 @@ class AssetManager {
         static void Init(ScreenData& screen_data);
         static void Destruct();
         static void SaveFinalRender(ScreenData& screen_data);
+        
+        static void ConfigureGenerationEffects();
 
         // converts a directory entry object to a string
         static std::string FilepathFromDirectoryEntry(std::filesystem::__cxx11::directory_entry entry);
@@ -53,7 +56,11 @@ class AssetManager {
         static const std::vector<sf::Texture*>& GetPalettes(){return m_palettes;}
         static const std::vector<sf::Texture*>& GetLightShapes(){return m_light_shapes;}
 
+        static const std::vector<GenerativeEffect>& GetGenerationEffects(){return m_generation_effects;}
+
     private:
+
+        static std::vector<GenerativeEffect> m_generation_effects;
 
         static int m_colour_increment; // only used to determine colour
         

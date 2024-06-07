@@ -8,6 +8,7 @@
 #include "Rect.h"
 #include "BezierCurve.h"
 #include "TileMaterial.h"
+#include "GenerationType.h"
 
 struct TileData{
     bool occupied = false;
@@ -31,7 +32,13 @@ struct VoxelData{
     bool occupied = false;
     sf::Color normal_colour = sf::Color::Black; // normal vector as colour
     bool draw_sides = true; // if false, the voxel only has its front face drawn (essentially as a 2d plane)
+    bool modified_by_generation = false; // prevents generation from applying effects twice voxels
+};
 
+struct GenerationCanvas{
+
+    GenerationType m_type;
+    std::vector<sf::Image*> m_tile_layer_images; // each layer of generation, is stored as a pointer to allow us to rearrange the generation stack
 };
 
 
@@ -48,12 +55,16 @@ class ScreenData {
         sf::RenderTexture m_canvas_depth;
         sf::RenderTexture m_canvas_shadow_map; // black is shadow, white is light
         sf::RenderTexture m_light_map;
+        sf::Image m_raycasted_shadows;
 
         // for anything that wont show up in final scene (UI helpers etc...)
         sf::RenderTexture m_general_surface;
 
-        sf::Vector3f m_flat_light_direction = sf::Vector3f(0.5,2.0,1.0);
+        sf::Vector3f m_flat_light_direction = sf::Vector3f(1.0,1.0, 1.5);
         sf::Uint32 m_shadow_lift = 0;
+
+        float perspective_constant = 0.001f;
+
 
         int m_tile_size;
         int m_tile_depth;
@@ -72,7 +83,7 @@ class ScreenData {
 
         std::vector<std::vector<std::vector<VoxelData>>> m_voxel_space;
 
-        std::vector<std::vector<sf::Image>> m_generation_canvas; // we paint our generative effects on each layer, [generation type][tile_layer][x][y]
+        std::vector<GenerationCanvas> m_generation_canvas; // we paint our generative effects on each layer, [generation type][tile_layer][x][y]
 
 
         // each vector represents a different tile_layer
@@ -114,12 +125,8 @@ class ScreenData {
                 }
             }
 
-            // TEMPORARY : Testing generative painting
-            m_generation_canvas.resize(1);
-            m_generation_canvas[0].resize(3);
-            m_generation_canvas[0][0].create(m_canvas_width, m_canvas_height, sf::Color(0,0,0,170));
-            m_generation_canvas[0][1].create(m_canvas_width, m_canvas_height, sf::Color(0,0,0,170));
-            m_generation_canvas[0][2].create(m_canvas_width, m_canvas_height, sf::Color(0,0,0,170));
+
+            m_raycasted_shadows.create(m_canvas_width, m_canvas_height, sf::Color::White);
 
             m_half_canvas_width = m_canvas_width / 2.0f;
             m_half_canvas_height = m_canvas_height / 2.0f;

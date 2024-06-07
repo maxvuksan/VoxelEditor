@@ -7,6 +7,7 @@
 std::vector<TileObject> AssetManager::m_tile_objects;
 std::vector<VoxelObject> AssetManager::m_voxel_objects;
 std::vector<TileMaterial> AssetManager::m_tile_materials;
+std::vector<GenerativeEffect> AssetManager::m_generation_effects;
 
 std::vector<std::string> AssetManager::m_tile_objects_names;
 std::vector<std::string> AssetManager::m_voxel_objects_names;
@@ -93,7 +94,16 @@ void AssetManager::Init(ScreenData& screen_data){
 
 
     ConstructTextureAtlas();
+    ConfigureGenerationEffects();
+}
 
+void AssetManager::ConfigureGenerationEffects(){
+
+    m_generation_effects.push_back({"Shadow", GenerationType::Shadow});
+    m_generation_effects.push_back({"Overshadow", GenerationType::Overshadow});
+    m_generation_effects.push_back({"Melt", GenerationType::Melt});
+    m_generation_effects.push_back({"Roots", GenerationType::Roots});
+    m_generation_effects.push_back({"Roots Chaotic", GenerationType::RootsChaotic});
 }
 
 void AssetManager::Destruct(){
@@ -129,20 +139,30 @@ void AssetManager::SaveFinalRender(ScreenData& screen_data){
         for(int y = 0; y < final_image.getSize().y; y++){
 
             sf::Color current_colour = final_image.getPixel(x, y);
+            int depth = depth_image.getPixel(x, y).r;
+
+            if(current_colour.a != 0){
+                // in light
+                current_colour.b = 255;
 
 
-            // in shadow
-            current_colour.b = 255;
-            // no shadow
-            if(light_map_image.getPixel(x, y) != sf::Color::White){
-                current_colour.b = 0;
+                // projects the flat lightmap onto the depth of the geometry, gives a 3d feeling
+                sf::Vector2f depth_shifted_coordinate = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x, y), screen_data, depth * screen_data.perspective_constant, true, true);
+
+                int depth_shifted_x = Calc::Clamp(round(depth_shifted_coordinate.x), 0, screen_data.m_canvas_width - 1);
+                int depth_shifted_y = Calc::Clamp(round(depth_shifted_coordinate.y), 0, screen_data.m_canvas_height - 1);
+
+
+                // in shadow,
+                if(light_map_image.getPixel(depth_shifted_x, depth_shifted_y) != sf::Color::White || screen_data.m_raycasted_shadows.getPixel(x, y) != sf::Color::White){
+                    current_colour.b = 0;
+                }
             }
-
 
 
             // depth will be packed within the alpha channel (its value being the z - 255)
             // so alpha of 255 will be z of 0
-            final_image.setPixel(x, y, sf::Color(current_colour.r, current_colour.g, current_colour.b, 255 - depth_image.getPixel(x, y).r));
+            final_image.setPixel(x, y, sf::Color(current_colour.r, current_colour.g, current_colour.b, 255 - depth));
         }
     }
 

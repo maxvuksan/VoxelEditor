@@ -8,6 +8,7 @@
 #include "Face.h"
 #include "GenerationType.h"
 #include "FaceDirection.h"
+#include "../System/Utility/PerlinNoise.h"
 
 
 
@@ -43,7 +44,6 @@ class Renderer {
         static void CreateVoxelFromVoxelObject(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer);
         static void CreateVoxelFromTileObject(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer);
         static void CreateVoxelsFromRopes(ScreenData& screen_data);
-        static void ManipulateVoxelsThroughGeneration(ScreenData& screen_data);
 
         static void DrawVoxelLayer(ScreenData& screen_data, int y_position, int z_position, sf::RenderTarget& surface, DrawMode draw_mode = NORMALS);
 
@@ -64,7 +64,22 @@ class Renderer {
 
         static bool m_demo_fog;
 
+
+
+        static void ManipulateVoxelsThroughGeneration(ScreenData& screen_data);
+
+        static void MarkVoxelsAsUntouchedByGeneration(ScreenData& screen_data);
+        // strength 0 -> 1
+
+        static void Generation_Shadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
+        static void Generation_Overshadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
+        static void Generation_Melt(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
+        static void Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS);
+
     private:
+
+        static PerlinNoise m_perlin; 
+
         static RenderStep m_render_progress;
         static int m_progress_increment_y; // the y position of computation, essentially scans the voxel grid with this value 
         static int m_progress_goal_y; // what the increment must reach

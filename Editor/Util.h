@@ -19,6 +19,31 @@ class Util{
 
     public:
 
+
+        static bool InCanvasBounds(ScreenData& screen_data, int x, int y){
+            if(y < 0 || y >= screen_data.m_canvas_height){
+                return false;
+            }
+            if(x < 0 || x >= screen_data.m_canvas_width){
+                return false;
+            }
+
+            return true;
+        }
+
+        static bool InCanvasBounds(ScreenData& screen_data, int x, int y, int z){
+            if(y < 0 || y >= screen_data.m_canvas_height){
+                return false;
+            }
+            if(x < 0 || x >= screen_data.m_canvas_width){
+                return false;
+            }
+            if(z < 0 || z >= screen_data.m_voxel_space.size()){
+                return false;
+            }
+            return true;
+        }
+
         // @returns the position symmetric to the provided x position
         static int GetSymmetricPositionX(ScreenData& screen_data, int x){
             
@@ -209,19 +234,20 @@ class Util{
         /*
             projects a 2D position into 3D space 
         */
-        static sf::Vector2f ShiftVertexOnPerspectiveAxis(sf::Vector2f position, const ScreenData& screen_data, float z_position, bool _floor = true){
+        static sf::Vector2f ShiftVertexOnPerspectiveAxis(sf::Vector2f position, const ScreenData& screen_data, float z_position, bool _floor = true, bool invert_shift = false){
             
             float distance = Calc::Distance(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height));
             sf::Vector2f shift = Calc::VectorBetween(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height)) * distance * z_position;
+            sf::Vector2f final;
 
-            sf::Vector2f final = position + shift;
-
-            if(_floor){
-                final = sf::Vector2f(floor(final.x), floor(final.y));
+            if(invert_shift){
+                final = position - shift;
             }
             else{
-                final = sf::Vector2f(ceil(final.x), ceil(final.y));
+                final = position + shift;
             }
+
+            final = sf::Vector2f(floor(final.x), floor(final.y));
 
             return final;
 

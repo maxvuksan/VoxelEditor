@@ -3,7 +3,6 @@
 #include <iostream>
 #include "Util.h"
 #include "AssetManager.h"
-#include "../System/Utility/PerlinNoise.h"
 
 NormalPreset Renderer::m_normal_dictionary[NUMBER_OF_FACES];
 sf::Image Renderer::m_spare_image;
@@ -13,6 +12,8 @@ int Renderer::m_progress_increment_y;
 int Renderer::m_progress_goal_y;
 int Renderer::m_progress_increment_z;
 int Renderer::m_progress_goal_z; 
+
+PerlinNoise Renderer::m_perlin;
 
 bool Renderer::m_demo_fog = false;
 
@@ -137,28 +138,41 @@ void Renderer::CreateVoxelsFromRopes(ScreenData& screen_data){
 
         for(auto& rope : screen_data.m_ropes[i]){
 
-            std::vector<sf::Vector2f> curve_points = rope.SamplePositions(0.0012);
+            std::vector<sf::Vector2f> curve_points = rope.SamplePositions(0.0005);
             
             for(auto& point : curve_points){
 
-                int x = floor(point.x);
-                int y = floor(point.y);
 
-                if(x < 0 || x >= screen_data.m_canvas_width){
-                    continue;
-                }
-                if(y < 0 || y >= screen_data.m_canvas_height){
-                    continue;
-                }
+                sf::Vector2f points_area[4] = 
+                {
+                    sf::Vector2f(point.x, point.y),
+                    sf::Vector2f(point.x + 1, point.y),
+                    sf::Vector2f(point.x, point.y + 1),
+                    sf::Vector2f(point.x + 1, point.y + 1),              
+                };
 
-                // skip occupied spaces
-                if(screen_data.m_voxel_space[z][x][y].occupied){
-                    continue;
-                }
 
-                screen_data.m_voxel_space[z][x][y].draw_sides = false;
-                screen_data.m_voxel_space[z][x][y].occupied = true;
-                screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;   
+                for(auto& sub_point : points_area){
+
+                    int x = floor(sub_point.x);
+                    int y = floor(sub_point.y);
+
+                    if(x < 0 || x >= screen_data.m_canvas_width){
+                        continue;
+                    }
+                    if(y < 0 || y >= screen_data.m_canvas_height){
+                        continue;
+                    }
+
+                    // skip occupied spaces
+                    if(screen_data.m_voxel_space[z][x][y].occupied){
+                        continue;
+                    }
+
+                    screen_data.m_voxel_space[z][x][y].draw_sides = false;
+                    screen_data.m_voxel_space[z][x][y].occupied = true;
+                    screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;   
+                }
 
             }
 
@@ -269,7 +283,6 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
 
     //std::cout << "[DRAWING LAYER]: " << z_position << "\n";
 
-    float perspective_constant = 0.001f;
     int depth_constant = z_position;
     int depth_further_constant = (z_position + 1);
     /*
@@ -282,7 +295,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
     // draw sides 
     for(int x = 0; x < screen_data.m_canvas_width; x++){
 
-            if(!screen_data.m_voxel_space[z_position][x][y].occupied){
+            if(!screen_data.m_voxel_space[z_position][x][y].occupied || !screen_data.m_voxel_space[z_position][x][y].draw_sides){
                 continue;
             }
 
@@ -290,7 +303,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
             Rect rect({x, y, 1, 1});
 
             // shift back by z position
-            sf::Vector2f new_rect_pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(rect.m_position_x, rect.m_position_y), screen_data, perspective_constant * z_position, true);
+            sf::Vector2f new_rect_pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(rect.m_position_x, rect.m_position_y), screen_data, screen_data.perspective_constant * z_position, true);
             rect.m_position_x = new_rect_pos.x;
             rect.m_position_y = new_rect_pos.y;
 
@@ -339,7 +352,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
                 }
 
                 // far vertex
-                vertex.position = Util::ShiftVertexOnPerspectiveAxis(positions_pairs[i], screen_data, perspective_constant, true);
+                vertex.position = Util::ShiftVertexOnPerspectiveAxis(positions_pairs[i], screen_data, screen_data.perspective_constant, true);
                 positions_pairs[i] = vertex.position;
                 if(draw_mode == DrawMode::DEPTH){
                     vertex.color = Util::ColourFromDepth(depth_further_constant);
@@ -349,7 +362,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
                 }
 
                 // far vertex
-                vertex.position = Util::ShiftVertexOnPerspectiveAxis(positions_pairs[i + 1], screen_data, perspective_constant, true);
+                vertex.position = Util::ShiftVertexOnPerspectiveAxis(positions_pairs[i + 1], screen_data, screen_data.perspective_constant, true);
                 if(draw_mode == DrawMode::DEPTH){
                     vertex.color = Util::ColourFromDepth(depth_further_constant);
                 }
@@ -365,6 +378,8 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
                 if(draw){
                     vertex_array.append(vertex);
                 }
+
+
             }
 
             // setting the end position to the translated end
@@ -387,27 +402,29 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
 
         vertex.color = screen_data.m_voxel_space[z_position][x][y].normal_colour;
 
-        sf::Vector2f pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x, y), screen_data, perspective_constant * z_position, true);
 
         if(draw_mode == DrawMode::DEPTH){
             vertex.color = Util::ColourFromDepth(depth_constant);
         }
 
-
+        sf::Vector2f pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x, y), screen_data, screen_data.perspective_constant * z_position, true);
         vertex.position.x = pos.x;
         vertex.position.y = pos.y;    
         vertex_array.append(vertex);
 
-        vertex.position.x = pos.x + 1;    
+        pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x + 0.5, y), screen_data, screen_data.perspective_constant * z_position, true);
+        vertex.position.x = pos.x;  
         vertex.position.y = pos.y;    
         vertex_array.append(vertex);
 
-        vertex.position.x = pos.x + 1;    
-        vertex.position.y = pos.y + 1;     
+        pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x + 0.5, y + 0.5), screen_data, screen_data.perspective_constant * z_position, true);
+        vertex.position.x = pos.x;
+        vertex.position.y = pos.y;     
         vertex_array.append(vertex);
 
+        pos = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x, y + 0.5), screen_data, screen_data.perspective_constant * z_position, true);
         vertex.position.x = pos.x;    
-        vertex.position.y = pos.y + 1;    
+        vertex.position.y = pos.y + 0.5;   
         vertex_array.append(vertex);
 
     }
@@ -416,47 +433,6 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
 
 
 
-
-}
-
-void Renderer::ManipulateVoxelsThroughGeneration(ScreenData& screen_data){
-
-    PerlinNoise perlin;
-
-    for(int i = 0; i < screen_data.m_tile_layers.size(); i++){
-
-        for(int z = i * screen_data.m_tile_depth; z < (i + 1) * screen_data.m_tile_depth; z++){
-            
-            for(int x = 0; x < screen_data.m_canvas_width; x++){
-                for(int y = 0; y < screen_data.m_canvas_height; y++){
-                    
-                    sf::Color pixel_colour = screen_data.m_generation_canvas[0][i].getPixel(x, y);
-            
-                    if(pixel_colour.r <= 1){
-                        continue;
-                    }
-
-
-                    float percent = pixel_colour.r / (float)255;
-
-                    double noise_val = perlin.octave2D_01(x * 0.01, y * 0.01, 2, 7);
-
-                    if(percent == 1.0 || noise_val * percent + percent * 0.2 > 1.0 - percent){
-                        screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
-                    }
-                    else if(noise_val * percent > 0.6 - percent){
-
-                        if(screen_data.m_voxel_space[z][x][y].normal_colour == m_normal_dictionary[FACE_TOP].normal_colour){
-                            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;
-                        }
-                        else{
-                            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
-                        }
-                    }
-                }
-            }
-        }
-    }
 
 }
 
@@ -672,6 +648,8 @@ void Renderer::ComputeNormalCanvas(ScreenData& screen_data, int y){
     is called after ComputeNormalCanvas() and after the depth texture is created 
 */
 void Renderer::ComputeRaycastedLighting(ScreenData& screen_data){
+    
+    screen_data.m_raycasted_shadows.create(screen_data.m_canvas_width, screen_data.m_canvas_height, sf::Color::White);    
 
     // pixel grid of the depth
     m_spare_image = screen_data.m_canvas_depth.getTexture().copyToImage();
@@ -685,12 +663,11 @@ void Renderer::ComputeRaycastedLighting(ScreenData& screen_data){
     }
 
     sf::Vector3f ray_step_direction = -screen_data.m_flat_light_direction * 0.1f; // * 0.0f;
-    ray_step_direction.z * 0.25f; // scale z direction so shadows become longer
 
     sf::Color shadow_colour;
 
     for(unsigned int x = 0; x < screen_data.m_canvas_width; x++){
-        break;
+        
         //std::cout << "[CASTING SHADOWS]: X: " << x << "/" << screen_data.m_canvas_width << "\n";
         
         for(unsigned int y = 0; y < screen_data.m_canvas_height; y++){
@@ -712,27 +689,277 @@ void Renderer::ComputeRaycastedLighting(ScreenData& screen_data){
 
 
                     if(Util::PositionIsInsideVoxel(screen_data, position)){
-                        shadow_colour = sf::Color(120,120,120); 
+                        shadow_colour = sf::Color::Black;
                         break;
                     }
                 }
 
-
-                screen_data.m_canvas_image.setPixel(x, y, shadow_colour);            
-            }
-            else{
-                screen_data.m_canvas_image.setPixel(x, y, sf::Color::White);    
+                screen_data.m_raycasted_shadows.setPixel(x, y, shadow_colour);       
             }
         }
     }
 
-
-    sf::Texture texture_from_img;
-    texture_from_img.loadFromImage(screen_data.m_canvas_image);
-
-    screen_data.m_canvas.draw(sf::Sprite(texture_from_img), sf::BlendMultiply);
-    
-    screen_data.m_canvas.display();
 }
 
 
+void Renderer::MarkVoxelsAsUntouchedByGeneration(ScreenData& screen_data){
+
+    for(int i = 0; i < screen_data.m_tile_layers.size(); i++){
+
+        // z axis
+        for(int z = i * screen_data.m_tile_depth; z < (i + 1) * screen_data.m_tile_depth; z++){
+            
+            // x axis
+            for(int x = 0; x < screen_data.m_canvas_width; x++){
+                
+                // y axis
+                for(int y = 0; y < screen_data.m_canvas_height; y++){
+
+                    screen_data.m_voxel_space[z][x][y].modified_by_generation = false;
+                }
+            }
+        }
+    }
+
+                        
+}
+
+
+void Renderer::ManipulateVoxelsThroughGeneration(ScreenData& screen_data){
+
+
+    // generator
+    for(int g = 0; g < screen_data.m_generation_canvas.size(); g++){
+
+        MarkVoxelsAsUntouchedByGeneration(screen_data);
+
+
+        // tile layer
+        for(int i = 0; i < screen_data.m_tile_layers.size(); i++){
+
+            sf::Image* gen_canvas = screen_data.m_generation_canvas[g].m_tile_layer_images[i];
+
+            // z axis
+            for(int z = i * screen_data.m_tile_depth; z < (i + 1) * screen_data.m_tile_depth; z++){
+                
+                // x axis
+                for(int x = 0; x < screen_data.m_canvas_width; x++){
+                    
+                    // y axis
+                    for(int y = 0; y < screen_data.m_canvas_height; y++){
+
+                        
+
+                        sf::Color pixel_colour = screen_data.m_generation_canvas[g].m_tile_layer_images[i]->getPixel(x, y);
+                
+                        if(pixel_colour.r <= 1){
+                            continue;
+                        }
+
+                        float percent = pixel_colour.r / (float)255;
+
+
+                        
+
+                        // apply correct effect
+                        switch(screen_data.m_generation_canvas[g].m_type){
+
+                            case Overshadow: {
+                                Generation_Overshadow(screen_data, gen_canvas, x, y, z, percent);
+                                break;
+                            }
+                            case Shadow: {
+                                Generation_Shadow(screen_data, gen_canvas, x, y, z, percent);
+                                break;
+                            }
+                            case Melt:
+                                Generation_Melt(screen_data, gen_canvas, x, y, z, percent);
+                                break;
+
+                            case Roots:
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, false);
+                                break;
+                            
+                            case RootsChaotic:
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, true);
+                                break;
+                        }
+
+                    }
+                }
+            }
+        }
+
+
+    }
+
+}
+
+
+void Renderer::Generation_Shadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent){
+
+    double noise_val = m_perlin.octave2D_01(x * 0.01, y * 0.01, 3, 0.5);
+
+    if(percent == 1.0 || noise_val * percent + percent * 0.2 > 0.8 - percent){
+
+        if(screen_data.m_voxel_space[z][x][y].normal_colour == m_normal_dictionary[FACE_TOP].normal_colour){
+            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;
+        }
+        else{
+            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
+        }
+    }
+}
+
+
+void Renderer::Generation_Overshadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent){
+
+    double noise_val = m_perlin.octave2D_01(x * 0.01, y * 0.01, 2, 0.5);
+
+    if(percent == 1.0 || noise_val * percent + percent * 0.2 > 1.0 - percent){
+        screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
+    }
+    else if(noise_val * percent > 0.6 - percent){
+
+        if(screen_data.m_voxel_space[z][x][y].normal_colour == m_normal_dictionary[FACE_TOP].normal_colour){
+            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;
+        }
+        else{
+            screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
+        }
+    }
+}
+
+void Renderer::Generation_Melt(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent){
+
+    double noise_val = m_perlin.octave3D_01(x * 0.16, y * 0.16, z * 0.15, 4, 0.5);
+
+    percent *= noise_val;
+
+    if(percent > 0.6 && y < screen_data.m_canvas_height - 1 && !screen_data.m_voxel_space[z][x][y + 1].modified_by_generation){
+        
+        // dont melt air 
+        if(!screen_data.m_voxel_space[z][x][y].occupied){
+            return;
+        }
+        
+        bool draw_sides = true;
+        if(!screen_data.m_voxel_space[z][x][y + 1].occupied || !screen_data.m_voxel_space[z][x][y + 1].draw_sides){
+            draw_sides = false;
+        }
+
+        screen_data.m_voxel_space[z][x][y + 1] = screen_data.m_voxel_space[z][x][y];
+        screen_data.m_voxel_space[z][x][y + 1].draw_sides = draw_sides;
+
+        screen_data.m_voxel_space[z][x][y + 1].modified_by_generation = true;
+    }
+
+}
+
+void Renderer::Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS){
+
+    double noise_val = m_perlin.octave3D_01(x * 0.4, y * 0.4, z * 0.06, 2, 0.5);
+
+    percent *= noise_val;
+
+    if(percent > 0.65 && y < screen_data.m_canvas_height - 1 && !screen_data.m_voxel_space[z][x][y + 1].occupied){
+        
+        // dont grow root out of air 
+        if(!screen_data.m_voxel_space[z][x][y].occupied || screen_data.m_voxel_space[z][x][y].modified_by_generation){
+            return;
+        }
+
+
+        int new_x = x;
+        int new_y = y;
+
+        int stop_distance = rand() % screen_data.m_tile_size;
+
+        // generating root
+        while(true){
+
+
+            // always move down
+            new_y++;
+
+            // randomly move on the x axis
+
+            if(CHAOS){
+                if(rand() % 100 < 60){
+                    if(rand() % 100 > 50){
+                        new_x++;
+                    }
+                    else{
+                        new_x--;
+                    }
+                }
+            }
+            else{
+                if(rand() % 100 < 12){
+                    if(rand() % 100 > 50){
+                        new_x++;
+                    }
+                    else{
+                        new_x--;
+                    }
+                }
+            }
+
+
+            if(!Util::InCanvasBounds(screen_data, new_x, new_y)){
+                break;
+            }
+
+            if(screen_data.m_voxel_space[z][new_x][new_y].occupied && !screen_data.m_voxel_space[z][new_x][new_y].modified_by_generation){
+                break;
+            }
+
+            // root stops
+            if(gen_canvas->getPixel(new_x, new_y).r < 0.6){
+                stop_distance--;
+            }
+            if(stop_distance <= 0){
+                break;
+            }
+
+
+            screen_data.m_voxel_space[z][new_x][new_y] = screen_data.m_voxel_space[z][x][y];
+            screen_data.m_voxel_space[z][new_x][new_y].draw_sides = false;
+            screen_data.m_voxel_space[z][new_x][new_y].modified_by_generation = true;
+
+            // make root thicker
+            if(Util::InCanvasBounds(screen_data, new_x + 1, new_y + 1)){
+
+
+                screen_data.m_voxel_space[z][new_x + 1][new_y] = screen_data.m_voxel_space[z][x][y];
+                screen_data.m_voxel_space[z][new_x + 1][new_y].draw_sides = false;
+                screen_data.m_voxel_space[z][new_x + 1][new_y].modified_by_generation = true;
+
+                screen_data.m_voxel_space[z][new_x + 1][new_y + 1] = screen_data.m_voxel_space[z][x][y];
+                screen_data.m_voxel_space[z][new_x + 1][new_y + 1].draw_sides = false;
+                screen_data.m_voxel_space[z][new_x + 1][new_y + 1].modified_by_generation = true;
+
+                screen_data.m_voxel_space[z][new_x][new_y + 1] = screen_data.m_voxel_space[z][x][y];
+                screen_data.m_voxel_space[z][new_x][new_y + 1].draw_sides = false;
+                screen_data.m_voxel_space[z][new_x][new_y + 1].modified_by_generation = true;
+            }
+
+
+        }
+
+
+        // creates a buffer between roots (spacing)
+        for(int _x = x - 6; _x <= x + 6; _x++){
+            for(int _y = y - 6; _y <= y + 6; _y++){
+                for(int _z = z - 7; _z <= y + 7; _z++){
+
+                    if(Util::InCanvasBounds(screen_data, _x, _y, _z)){
+                        screen_data.m_voxel_space[_z][_x][_y].modified_by_generation = true;
+                    }
+                }
+
+            }
+        }
+    }
+
+}
