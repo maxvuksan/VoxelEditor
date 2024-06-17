@@ -3,9 +3,9 @@
 
 struct TileMaterial{
 
-    bool round_edges;    
+    bool round_edges = false;    
     
-    sf::Texture* texture; 
-    sf::Image* image_texture;
+    sf::Texture* texture = nullptr; 
+    sf::Image* image_texture = nullptr;
 
 };

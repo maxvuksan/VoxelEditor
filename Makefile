@@ -1,6 +1,6 @@
 # libs 
 SFML = -lsfml-graphics -lopengl32 -lsfml-network -lsfml-audio -lsfml-window -lsfml-system -DSFML_STATIC
-LIBS = -Lsrc/lib $(SFML) 
+LIBS = -Lsrc/lib $(SFML)  -lcomdlg32
 
 SYSTEM = System/Utility/*.cpp System/Core/*.cpp
 EDITOR = Editor/*.cpp
@@ -44,7 +44,7 @@ all: $(EXE_NAME)
 # work around
 
 compile:
-	g++ -g -o editor.exe -Isrc/include main.cpp $(EDITOR) $(SYSTEM) $(LIBS) 
+	g++ -g -o editor.exe  -Isrc/include main.cpp $(EDITOR) $(SYSTEM) $(LIBS) 
 	./editor.exe
 
 

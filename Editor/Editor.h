@@ -3,7 +3,6 @@
 //////////////////////////////
 
 #include "../System/include.h"
-#include "Camera.h"
 #include "ScreenData.h"
 
 
@@ -24,6 +23,7 @@ class Editor : public Core {
     enum TileTool {
         BRUSH,
         RECTANGLE,
+        CURSOR, 
         NUMBER_OF_TILE_TOOLS,
     };
 
@@ -55,28 +55,27 @@ class Editor : public Core {
         // for TileMode == Tiles
         void DrawTileGuides(sf::RenderTarget& surface);
         // for TileMode == Material
-        void DrawMaterialGuides(sf::RenderTarget& surface);
+        void DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_nodes = true);
 
-        void DrawRopeGuides(sf::RenderTarget& surface);
+        void DrawRopeGuides(sf::RenderTarget& surface, bool only_draw = false);
 
         void DrawGenerationGuides(sf::RenderTarget& surface);
 
         void DrawLightmapGuides(sf::RenderTarget& surface);
 
-        // applys weight to pixels by amount (which can be either positive (adding) or negative (erasing) )
-        void PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, int brush_size);
+        // applys weight to pixels by amount 
+        void PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, int brush_size, bool erase);
         void AverageInbetweenGenerationPoints(int min_x, int max_x, int min_y, int max_y);
 
-        void SetVoxelObject(int x, int y);
-        void SetTileObject(int x, int y);
-        void SetTileMaterial(int x, int y);
+        void SetVoxelObject(int x, int y, bool propogate_to_symmetric = true);
+        void SetTileObject(int x, int y, bool propogate_to_symmetric = true);
+        void SetTileMaterial(int x, int y, bool propogate_to_symmetric = true);
 
         void MouseHandling();
 
         void CreateRect(bool remove);
 
         void CatchEvent(const sf::Event& event) override;
-
 
     protected:
 
@@ -88,9 +87,10 @@ class Editor : public Core {
         sf::Sprite m_lightmap_sprite;
         float lightmap_sprite_scale_x = 1.0;
         float lightmap_sprite_scale_y = 1.0;
-        int lightmap_sprite_rotation = 0;
+        float lightmap_sprite_rotation = 0;
 
         sf::Shader m_colour_level_shader;
+        sf::Shader m_ghost_shader;
 
         sf::Vector2f m_mouse_position;
         sf::Vector2f m_canvas_position_free;
@@ -133,11 +133,13 @@ class Editor : public Core {
 
         int m_brush_size; // used for generation editing
         int m_generation_brush_density; // 5 - 255
+        
 
         int m_current_tile_layer;
 
         sf::Text m_text;
         sf::Font m_font;
+        int m_text_spacing;
 
         sf::Texture palette_texture;
 
@@ -148,8 +150,6 @@ class Editor : public Core {
         sf::RenderTexture m_tile_guides;
 
         ScreenData m_screen_data;
-
-        Camera m_camera;
 
 
 };

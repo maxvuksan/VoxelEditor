@@ -8,6 +8,8 @@ enum GenerationType{
     Melt, 
     Roots, // placed on ceilings
     RootsChaotic,
+    ThickRoots,
+    ThickRootsChaotic,
     NUMBER_OF_GENERATION_TYPES,
 };
 

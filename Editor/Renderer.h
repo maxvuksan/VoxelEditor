@@ -74,7 +74,7 @@ class Renderer {
         static void Generation_Shadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
         static void Generation_Overshadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
         static void Generation_Melt(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
-        static void Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS);
+        static void Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS, bool THICK);
 
     private:
 

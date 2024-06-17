@@ -37,6 +37,7 @@ void AssetManager::Init(ScreenData& screen_data){
         CreateTileMaterial(RemoveDirectoryFromFilepath(directory, filenames[i]), filenames[i], false);
     }
 
+
     // tile objects ______________________________________________________________________________________
 
     directory = "Assets/tile_objects";
@@ -59,6 +60,7 @@ void AssetManager::Init(ScreenData& screen_data){
         filenames.push_back(FilepathFromDirectoryEntry(dir_entry));
     }
 
+
     for(int i = 0; i < filenames.size(); i++){
         CreateVoxelObject(RemoveDirectoryFromFilepath(directory, filenames[i]), filenames[i], screen_data, true);
     }
@@ -76,6 +78,7 @@ void AssetManager::Init(ScreenData& screen_data){
         CreateVoxelObject(RemoveDirectoryFromFilepath(directory, filenames[i]), filenames[i], screen_data, false);
     }
 
+
     // light shapes (for lightmap)
 
     directory = "Assets/Palettes";
@@ -92,7 +95,6 @@ void AssetManager::Init(ScreenData& screen_data){
         m_light_shapes[m_light_shapes.size() - 1]->loadFromFile(dir_entry.path().string());
     }
 
-
     ConstructTextureAtlas();
     ConfigureGenerationEffects();
 }
@@ -104,6 +106,8 @@ void AssetManager::ConfigureGenerationEffects(){
     m_generation_effects.push_back({"Melt", GenerationType::Melt});
     m_generation_effects.push_back({"Roots", GenerationType::Roots});
     m_generation_effects.push_back({"Roots Chaotic", GenerationType::RootsChaotic});
+    m_generation_effects.push_back({"Thick Roots", GenerationType::ThickRoots});
+    m_generation_effects.push_back({"Thick Roots Chaotic", GenerationType::ThickRootsChaotic});
 }
 
 void AssetManager::Destruct(){
@@ -190,21 +194,31 @@ void AssetManager::ConstructTextureAtlas(){
 
     // idea from https://x.com/Billy_Basso/status/1579863034486743040
 
+
     int step_size = 16;
     m_texture_atlas.create(16 * 100, 16 * 100);
     m_texture_atlas.clear(sf::Color::Transparent);
 
+
     // sort objects by width
     std::sort(m_voxel_objects.begin(), m_voxel_objects.end(), [](const VoxelObject& a, const VoxelObject& b) {
-        return a.tile_width > a.tile_height;
+        return a.tile_width > b.tile_width;
     });
 
     std::sort(m_tile_objects.begin(), m_tile_objects.end(), [](const TileObject& a, const TileObject& b) {
-        return a.tile_width > a.tile_height;
+        return a.tile_width > b.tile_width;
     });
 
+    
     auto doesObjectCollide = [&](int x, int y, int width, int height) {
 
+        if(x + width >= m_texture_atlas.getSize().x){
+            return true;
+        }
+        if(y + height >= m_texture_atlas.getSize().y){
+            return true;
+        }
+        
         // check if new placement would overlap with previous
         for(int i = 0; i < m_voxel_objects.size(); i++){
             if(m_voxel_objects[i].texture_atlas_position_x == -1 || m_voxel_objects[i].texture_atlas_position_y == -1){
@@ -232,14 +246,14 @@ void AssetManager::ConstructTextureAtlas(){
 
         return false;
     };
+    
 
     for(int i = 0; i < m_voxel_objects.size(); i++){
-
         for(int y = 0; y < m_texture_atlas.getSize().y; y += step_size){
             bool set_sprite = false;
             for(int x = 0; x < m_texture_atlas.getSize().x; x += step_size){
 
-                if(!doesObjectCollide(x, y, m_voxel_objects[i].tile_width, m_voxel_objects[i].tile_height)){
+                if(!doesObjectCollide(x, y, m_voxel_objects[i].layer_width, m_voxel_objects[i].layer_height)){
 
                     m_voxel_objects[i].sprite_texture.setPosition(x, y);
                     m_texture_atlas.draw(m_voxel_objects[i].sprite_texture);
@@ -262,7 +276,7 @@ void AssetManager::ConstructTextureAtlas(){
             bool set_sprite = false;
             for(int x = 0; x < m_texture_atlas.getSize().x; x += step_size){
 
-                if(!doesObjectCollide(x, y, m_tile_objects[i].tile_width, m_tile_objects[i].tile_height)){
+                if(!doesObjectCollide(x, y, m_tile_objects[i].layer_width, m_tile_objects[i].layer_height)){
 
                     m_tile_objects[i].sprite_texture.setPosition(x, y);
                     m_texture_atlas.draw(m_tile_objects[i].sprite_texture);

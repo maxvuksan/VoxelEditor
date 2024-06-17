@@ -63,7 +63,7 @@ class ScreenData {
         sf::Vector3f m_flat_light_direction = sf::Vector3f(1.0,1.0, 1.5);
         sf::Uint32 m_shadow_lift = 0;
 
-        float perspective_constant = 0.001f;
+        float perspective_constant = 0.0015f;
 
 
         int m_tile_size;

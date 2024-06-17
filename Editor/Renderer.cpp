@@ -235,7 +235,7 @@ void Renderer::CreateVoxelFromVoxelObject(ScreenData& screen_data, int tile_x, i
                 //otherwise add..
 
                 screen_data.m_voxel_space[z + layer][canvas_x + x][canvas_y + y].normal_colour = sampled_pixel;
-                screen_data.m_voxel_space[z + layer][canvas_x + x][canvas_y + y].draw_sides = voxel_material.draw_sides;
+                screen_data.m_voxel_space[z + layer][canvas_x + x][canvas_y + y].draw_sides = true;
                 screen_data.m_voxel_space[z + layer][canvas_x + x][canvas_y + y].occupied = true;
             }
         }
@@ -298,6 +298,27 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
             if(!screen_data.m_voxel_space[z_position][x][y].occupied || !screen_data.m_voxel_space[z_position][x][y].draw_sides){
                 continue;
             }
+            
+            bool tileInFront = false;
+            if(z_position < screen_data.m_voxel_space.size() - 1){
+                if(screen_data.m_voxel_space[z_position + 1][x][y].occupied && screen_data.m_voxel_space[z_position + 1][x][y].draw_sides){
+                    tileInFront = true;
+                }
+            }
+
+            bool tileBehind = false;
+            if(z_position > 0){
+
+                if(screen_data.m_voxel_space[z_position - 1][x][y].occupied && screen_data.m_voxel_space[z_position - 1][x][y].draw_sides){
+                    tileBehind = true;
+                }
+            }
+
+            // dont draw single layer voxels sides
+            if(!tileInFront && !tileBehind){
+                continue;
+            }
+
 
             // convert each voxel to a rect
             Rect rect({x, y, 1, 1});
@@ -337,7 +358,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
                         vertex.color = screen_data.m_voxel_space[z_position][x][y].normal_colour;
                     }
                     else{
-                        vertex.color = m_normal_dictionary[i + 1].normal_colour;
+                        vertex.color = m_normal_dictionary[FACE_FRONT].normal_colour;
                     }
 
                 }
@@ -776,13 +797,19 @@ void Renderer::ManipulateVoxelsThroughGeneration(ScreenData& screen_data){
                                 Generation_Melt(screen_data, gen_canvas, x, y, z, percent);
                                 break;
 
+                            // roots
                             case Roots:
-                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, false);
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, false, false);
                                 break;
-                            
                             case RootsChaotic:
-                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, true);
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, true, false);
                                 break;
+                            case ThickRoots:
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, false, true);
+                                break;
+                            case ThickRootsChaotic:
+                                Generation_Roots(screen_data, gen_canvas, x, y, z, percent, true, true);
+                                break;             
                         }
 
                     }
@@ -856,7 +883,7 @@ void Renderer::Generation_Melt(ScreenData& screen_data, sf::Image* gen_canvas, i
 
 }
 
-void Renderer::Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS){
+void Renderer::Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS, bool THICK){
 
     double noise_val = m_perlin.octave3D_01(x * 0.4, y * 0.4, z * 0.06, 2, 0.5);
 
@@ -894,17 +921,6 @@ void Renderer::Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, 
                     }
                 }
             }
-            else{
-                if(rand() % 100 < 12){
-                    if(rand() % 100 > 50){
-                        new_x++;
-                    }
-                    else{
-                        new_x--;
-                    }
-                }
-            }
-
 
             if(!Util::InCanvasBounds(screen_data, new_x, new_y)){
                 break;
@@ -928,7 +944,7 @@ void Renderer::Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, 
             screen_data.m_voxel_space[z][new_x][new_y].modified_by_generation = true;
 
             // make root thicker
-            if(Util::InCanvasBounds(screen_data, new_x + 1, new_y + 1)){
+            if(THICK && Util::InCanvasBounds(screen_data, new_x + 1, new_y + 1)){
 
 
                 screen_data.m_voxel_space[z][new_x + 1][new_y] = screen_data.m_voxel_space[z][x][y];

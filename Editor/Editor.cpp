@@ -2,15 +2,16 @@
 #include "Renderer.h"
 #include "AssetManager.h"
 #include "Util.h"
+#include "Serilizer.h"
+
 
 void Editor::Start(){
 
-    
     if(!m_font.loadFromFile("Assets/Roboto-Medium.ttf")){
         //std::cout << "[ERROR]: Failed to load font, Editor::Start()\n";
     }
 
-    const std::string frag_shader = \
+    std::string frag_shader = \
 
         "uniform sampler2D u_texture;"\
         "uniform sampler2D u_palette_texture;"\ 
@@ -32,19 +33,35 @@ void Editor::Start(){
         //std::cout << "[ERROR]: Failed to load font, Editor::Start()\n";
     }
 
+
+    frag_shader = \
+
+        "uniform sampler2D u_texture;"\
+
+        "void main()"\
+        "{"\
+            "vec4 sampled_pixel = texture2D(u_texture, gl_TexCoord[0].xy);"\
+
+            "gl_FragColor = vec4(1.0,1.0,1.0, ceil(sampled_pixel.a) * 0.35);"\
+        "}";
+
+    if(!m_ghost_shader.loadFromMemory(frag_shader, sf::Shader::Fragment)){
+        //std::cout << "[ERROR]: Failed to load font, Editor::Start()\n";
+    }
+
+
     palette_texture.loadFromFile("Assets/Palettes/palette_1.png");
 
 
+    m_text_spacing = 16;
     m_text.setFont(m_font);
-    m_text.setCharacterSize(16);
-
-    m_camera.m_perspective_factor = 0.1;
+    m_text.setCharacterSize(14);
 
     m_window.setMouseCursorVisible(false);
 
     // should be even?
 
-    m_screen_data.Create(110, 54, 16, 16);
+    m_screen_data.Create(100, 48, 16, 8);
 
     canvas_outline.setOutlineColor(sf::Color::White);
     canvas_outline.setOutlineThickness(1);
@@ -70,6 +87,7 @@ void Editor::Start(){
 
     m_brush_size = 1;
     selected_palette = 0;
+    m_generation_brush_density = 1;
 
     palette_preview = false;
     viewing_generation_stack = false;
@@ -112,9 +130,11 @@ void Editor::Update(){
 
 void Editor::DrawPalettePreview(){
 
+    float scale = 1.0f;
 
     palette_preview_sprite.setOrigin(sf::Vector2f(floor(m_screen_data.m_canvas_width / 2.0f), floor(m_screen_data.m_canvas_height / 2.0f)));
     palette_preview_sprite.setPosition(floor(m_window.getSize().x / 2.0f), floor(m_window.getSize().y / 2.0f));
+    palette_preview_sprite.setScale(sf::Vector2f(scale, scale));
 
     m_colour_level_shader.setParameter("u_texture", sf::Shader::CurrentTexture);
     m_colour_level_shader.setParameter("u_palette_texture", *AssetManager::GetPalettes()[selected_palette]);
@@ -122,10 +142,10 @@ void Editor::DrawPalettePreview(){
     m_window.draw(palette_preview_sprite, &m_colour_level_shader);
 
     sf::Sprite palette_sprite(*AssetManager::GetPalettes()[selected_palette]);
-    palette_sprite.setPosition(sf::Vector2f(32, 64));
-    palette_sprite.setScale(sf::Vector2f(32,32));
+    palette_sprite.setPosition(sf::Vector2f(m_text_spacing, 64));
+    palette_sprite.setScale(sf::Vector2f(m_text_spacing,m_text_spacing));
 
-    m_text.setPosition(sf::Vector2f(32,32));
+    m_text.setPosition(sf::Vector2f(m_text_spacing,m_text_spacing));
     m_text.setColor(sf::Color::White);
     m_text.setString("(E/D) Cycle Palettes");
     m_window.draw(m_text);
@@ -138,7 +158,7 @@ void Editor::DrawEditorText(){
     // tool text
     for(int i = 0; i < NUMBER_OF_TILE_TOOLS; i++){
 
-        m_text.setPosition(sf::Vector2f(32,32 * (i + 1)));
+        m_text.setPosition(sf::Vector2f(m_text_spacing,m_text_spacing * (i + 1)));
         m_text.setColor(sf::Color::White);
         switch(i){
             case TileTool::BRUSH:{
@@ -147,6 +167,10 @@ void Editor::DrawEditorText(){
             }
             case TileTool::RECTANGLE:{
                 m_text.setString("(R) Rectangle");
+                break;
+            }
+            case TileTool::CURSOR:{
+                m_text.setString("(V) Cursor");
                 break;
             }
         }
@@ -162,7 +186,7 @@ void Editor::DrawEditorText(){
     
     m_text.setColor(sf::Color::White);
     m_text.setString("(Esc) Palette Preview");
-    m_text.setPosition(sf::Vector2f(32, 32 * 3));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_text_spacing * 6));
     m_window.draw(m_text);
     
     if(m_symmetric_x){
@@ -172,7 +196,7 @@ void Editor::DrawEditorText(){
         m_text.setColor(sf::Color::White);
     }
     m_text.setString("(1) X Symmetric");
-    m_text.setPosition(sf::Vector2f(32, 32 * 4));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_text_spacing * 7));
     m_window.draw(m_text);
 
     if(m_symmetric_y){
@@ -182,7 +206,7 @@ void Editor::DrawEditorText(){
         m_text.setColor(sf::Color::White);
     }
     m_text.setString("(2) Y Symmetric");
-    m_text.setPosition(sf::Vector2f(32, 32 * 5));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_text_spacing * 8));
     m_window.draw(m_text);
     if(m_material_creates_geometry){
         m_text.setColor(sf::Color::Green);
@@ -191,14 +215,14 @@ void Editor::DrawEditorText(){
         m_text.setColor(sf::Color::White);
     }
     m_text.setString("(3) Material Creates Tiles");
-    m_text.setPosition(sf::Vector2f(32, 32 * 6));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_text_spacing * 9));
     m_window.draw(m_text);
 
 
 
     m_text.setColor(sf::Color::White);
     m_text.setString("(W/S) Tile Layer");
-    m_text.setPosition(sf::Vector2f(32, 232));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, 200 + m_text_spacing));
     m_window.draw(m_text);
     
     for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
@@ -206,7 +230,7 @@ void Editor::DrawEditorText(){
         m_text.setString("Layer " + std::to_string(i + 1));
 
         m_text.setColor(sf::Color::White);
-        m_text.setPosition(sf::Vector2f(32, 200 + 32 * (i + 2)));
+        m_text.setPosition(sf::Vector2f(m_text_spacing, 200 + m_text_spacing * (i + 2)));
 
         if(i == m_current_tile_layer){
             m_text.setColor(sf::Color::Red);
@@ -218,7 +242,7 @@ void Editor::DrawEditorText(){
     // view mode 
     m_text.setColor(sf::Color::White);
     m_text.setString("(Up/Down) View Mode");
-    m_text.setPosition(sf::Vector2f(32, 365 + 32));
+    m_text.setPosition(sf::Vector2f(m_text_spacing, 365 + m_text_spacing));
     m_window.draw(m_text);
     
     for(int i = 0; i < TileMode::NUMBER_OF_VIEWMODES; i++){
@@ -240,7 +264,7 @@ void Editor::DrawEditorText(){
                 m_text.setString("Lightmap");
                 break;    
             case TileMode::Voxel:
-                m_text.setString("Renderer");
+                m_text.setString("(LCtrl + R) Render Room");
                 break;           
         }
 
@@ -251,9 +275,15 @@ void Editor::DrawEditorText(){
             m_text.setColor(sf::Color::White);
         }
 
-        m_text.setPosition(sf::Vector2f(32, 365 + 32 * (i + 2)));
+        if(i == TileMode::Voxel){
 
-        m_window.draw(m_text);
+            m_text.setPosition(sf::Vector2f(m_text_spacing, 365 + m_text_spacing * (i + 3)));
+            m_window.draw(m_text);
+        }
+        else{
+            m_text.setPosition(sf::Vector2f(m_text_spacing, 365 + m_text_spacing * (i + 2)));
+            m_window.draw(m_text);
+        }
     }
 
     // draw tile material list
@@ -282,11 +312,11 @@ void Editor::DrawEditorText(){
                 break;
             }
         }
-        m_text.setPosition(sf::Vector2f(260, 32 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing ));
         m_window.draw(m_text);
 
         m_text.setString("(Tab) Switch Material Mode");
-        m_text.setPosition(sf::Vector2f(260, 64 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 2 ));
         m_window.draw(m_text);
 
         for(int i = 0; i < materials->size(); i++){
@@ -301,7 +331,7 @@ void Editor::DrawEditorText(){
 
             }
 
-            m_text.setPosition(sf::Vector2f(260, 32 * (i + 4)));
+            m_text.setPosition(sf::Vector2f(260, m_text_spacing * (i + 4)));
 
             m_window.draw(m_text);
         }
@@ -309,15 +339,15 @@ void Editor::DrawEditorText(){
 
     if(m_view_mode == TileMode::Rope){
         m_text.setString("(C) Clear Ropes");
-        m_text.setPosition(sf::Vector2f(260, 32 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing ));
         m_window.draw(m_text);
 
         m_text.setString("(E/D) Adjusted Selected Rope Slack");
-        m_text.setPosition(sf::Vector2f(260, 32 * 2 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 2 ));
         m_window.draw(m_text);
 
         m_text.setString("(MMB) Select Rope Point");
-        m_text.setPosition(sf::Vector2f(260, 32 * 3 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 3 ));
         m_window.draw(m_text);
 
 
@@ -334,28 +364,28 @@ void Editor::DrawEditorText(){
         if(viewing_generation_stack){
 
             m_text.setString("(Tab) View Effects List");
-            m_text.setPosition(sf::Vector2f(360, 32 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing ));
             m_window.draw(m_text);
 
             m_text.setString("(E/D) Cycle Effects");
-            m_text.setPosition(sf::Vector2f(360, 64 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * 2 ));
             m_window.draw(m_text);
 
             m_text.setString("(LShift + E/D) Reorder");
-            m_text.setPosition(sf::Vector2f(360, 32 * 3 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * 3 ));
             m_window.draw(m_text);
 
             m_text.setString("(Del) Delete Effect");
-            m_text.setPosition(sf::Vector2f(360, 32 * 4 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * 4 ));
             m_window.draw(m_text);
 
 
             m_text.setString("Applied FIRST -> LAST");
-            m_text.setPosition(sf::Vector2f(360, 32 * 6 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * 6 ));
             m_window.draw(m_text);    
             m_text.setColor(sf::Color(49, 71, 107));
             m_text.setString("[ FIRST ]");
-            m_text.setPosition(sf::Vector2f(360, 32 * 7 ));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * 7 ));
             m_window.draw(m_text);     
 
             int i;
@@ -372,28 +402,28 @@ void Editor::DrawEditorText(){
 
                 }
 
-                m_text.setPosition(sf::Vector2f(360, 32 * (i + 8)));
+                m_text.setPosition(sf::Vector2f(360, m_text_spacing * (i + 8)));
                 m_window.draw(m_text);
             }
 
             m_text.setColor(sf::Color(49, 71, 107));
             m_text.setString("[ LAST ]");
-            m_text.setPosition(sf::Vector2f(360, 32 * (i + 8)));
+            m_text.setPosition(sf::Vector2f(360, m_text_spacing * (i + 8)));
             m_window.draw(m_text);     
 
         }
         else{
 
             m_text.setString("(Tab) View Effect Stack");
-            m_text.setPosition(sf::Vector2f(260, 32 ));
+            m_text.setPosition(sf::Vector2f(260, m_text_spacing ));
             m_window.draw(m_text);
 
             m_text.setString("(E/D) Cycle Effects");
-            m_text.setPosition(sf::Vector2f(260, 64 ));
+            m_text.setPosition(sf::Vector2f(260, m_text_spacing * 2 ));
             m_window.draw(m_text);
 
             m_text.setString("(Enter) Append Effect to Stack");
-            m_text.setPosition(sf::Vector2f(260, 32 * 3 ));
+            m_text.setPosition(sf::Vector2f(260, m_text_spacing * 3 ));
             m_window.draw(m_text);
 
 
@@ -410,7 +440,7 @@ void Editor::DrawEditorText(){
 
                 }
 
-                m_text.setPosition(sf::Vector2f(260, 32 * (i + 5)));
+                m_text.setPosition(sf::Vector2f(260, m_text_spacing * (i + 5)));
                 m_window.draw(m_text);
             }
         }
@@ -422,32 +452,61 @@ void Editor::DrawEditorText(){
 
     if(m_view_mode == TileMode::Lightmap){
         m_text.setString("(C) Clear Lightmap");
-        m_text.setPosition(sf::Vector2f(260, 32 * 2 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 2 ));
         m_window.draw(m_text);
 
         m_text.setString("(F) Fill Lightmap");
-        m_text.setPosition(sf::Vector2f(260, 32 * 3 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 3 ));
         m_window.draw(m_text);
 
         m_text.setString("(E/D) Cycle Sprites");
-        m_text.setPosition(sf::Vector2f(260, 32 * 4 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 4 ));
         m_window.draw(m_text);
         
         m_text.setString("(MMB) Rotate");
-        m_text.setPosition(sf::Vector2f(260, 32 * 5 ));
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 6 ));
         m_window.draw(m_text);
 
-        m_text.setString("(MScroll) Scale Y");
-        m_text.setPosition(sf::Vector2f(260, 32 * 6 ));
+        m_text.setString("(+ LShift) Rotate Factor");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 7 ));
         m_window.draw(m_text);
 
-        m_text.setString("(MScroll + Shift) Scale X");
-        m_text.setPosition(sf::Vector2f(260, 32 * 7 ));
+        m_text.setString("(+ LAlt) Rotate Direction");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 8 ));
+        m_window.draw(m_text);
+
+        m_text.setString("(MScroll) Scale");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 10 ));
+        m_window.draw(m_text);
+
+        m_text.setString("(+ LShift) Scale Factor");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 11 ));
+        m_window.draw(m_text);
+
+        m_text.setString("(+ LAlt) Scale Axis");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing * 12 ));
         m_window.draw(m_text);
 
     }
 
+    std::string saveFile = "[UNSAVED]";
 
+    if(Serilizer::GetCurrentWorkingFile() != ""){
+        saveFile = Serilizer::GetCurrentWorkingFile();
+    }
+
+    m_text.setColor(sf::Color::White);
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_window.getSize().y - 64));
+    m_text.setString("Current Save : " + saveFile);
+    m_window.draw(m_text);
+
+    m_text.setString("(LCtrl + S) Save Room");
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_window.getSize().y - 64 - m_text_spacing));
+    m_window.draw(m_text);
+
+    m_text.setString("(LCtrl + O) Open Room");
+    m_text.setPosition(sf::Vector2f(m_text_spacing, m_window.getSize().y - 64 - 64));
+    m_window.draw(m_text);
 }
 
 
@@ -510,7 +569,7 @@ void Editor::DrawTileGuides(sf::RenderTarget& surface){
 
 }
 
-void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
+void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_nodes){
 
     int quarter_tile_size = m_screen_data.m_tile_size / 4.0f;
 
@@ -624,7 +683,7 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
 
                         vertex.color = sf::Color::White;
 
-                        auto tile_obj = AssetManager::GetTileObject(m_screen_data.m_tile_layers[i][x][y].voxel_object_index);
+                        auto tile_obj = AssetManager::GetTileObject(m_screen_data.m_tile_layers[i][x][y].tile_object_index);
 
                         vertex.position.x = _x;
                         vertex.position.y = _y;
@@ -652,7 +711,7 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
                     }
                 }
                 // tile materials
-                else{
+                else if(draw_material_nodes){
 
                     vertex.color = Util::GetColourFromColourLoop(m_screen_data.m_tile_layers[i][x][y].tile_material_index);
 
@@ -686,88 +745,50 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface){
         */
         sf::RenderStates texture_atlas_rs;
         texture_atlas_rs.texture = &AssetManager::GetTextureAtlas().getTexture();
+
+        if(!draw_material_nodes){
+            texture_atlas_rs.shader = &m_ghost_shader;
+            m_ghost_shader.setParameter("u_texture", sf::Shader::CurrentTexture);
+        }
         surface.draw(object_guides, texture_atlas_rs);
     
     }
 
 }
 
-void Editor::DrawRopeGuides(sf::RenderTarget& surface){
+void Editor::DrawRopeGuides(sf::RenderTarget& surface, bool only_draw){
 
-    // move rope being created to mouse pos
-    if(rope_being_created != nullptr){
-        
-        rope_being_created->end = m_canvas_coordinate;
-        
-        // adjust slack
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::E)){
-            rope_being_created->slack -= 3.0f;
-        }    
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D)){
-            rope_being_created->slack += 3.0f;
-        }
-    }
-    // moving rope
-    else if(rope_being_moved != nullptr){
-        
-        *rope_position_being_moved = m_canvas_coordinate;
-        // adjust slack
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::E)){
-            rope_being_moved->slack -= 3.0f;
-        }    
-        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D)){
-            rope_being_moved->slack += 3.0f;
-        }
-    }
-    for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
-
-        sf::VertexArray tile_guides;
-        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
-        
-        sf::Vertex vertex;
-
-        for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
-            for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
-                
-                if(!m_screen_data.m_tile_layers[i][x][y].occupied){
-                    continue;
-                }
-
-                float _x = x * m_screen_data.m_tile_size;
-                float _y = y * m_screen_data.m_tile_size;
-
-                // only show selected layer (to draw materials on)
-                if(i == m_current_tile_layer){
-                    vertex.color = sf::Color(0,0,0,150);
-                }
-                else{
-                    vertex.color = sf::Color(0,0,0,20);
-                }
-
-
-                // construct square for tile
-                vertex.position.x = _x;
-                vertex.position.y = _y;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y; 
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
+    if(!only_draw){
+        // move rope being created to mouse pos
+        if(rope_being_created != nullptr){
+            
+            rope_being_created->end = m_canvas_coordinate;
+            
+            // adjust slack
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::E)){
+                rope_being_created->slack -= 3.0f;
+            }    
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D)){
+                rope_being_created->slack += 3.0f;
             }
         }
-        
-        surface.draw(tile_guides);
-        tile_guides.clear();
+        // moving rope
+        else if(rope_being_moved != nullptr){
+            
+            *rope_position_being_moved = m_canvas_coordinate;
+            // adjust slack
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::E)){
+                rope_being_moved->slack -= 3.0f;
+            }    
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D)){
+                rope_being_moved->slack += 3.0f;
+            }
+        }
+    }
+    DrawMaterialGuides(surface, false);
 
+    
+    for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
 
         sf::Vertex rope_vertex;
         sf::VertexArray rope_vertex_array;
@@ -777,6 +798,16 @@ void Editor::DrawRopeGuides(sf::RenderTarget& surface){
             rope_vertex.color = sf::Color::Yellow;
         }
         else{
+            rope_vertex.color = sf::Color(0,0,0,50);
+        }
+
+
+        if(only_draw){
+
+            if(i != m_current_tile_layer){
+                continue;
+            }
+
             rope_vertex.color = sf::Color(0,0,0,50);
         }
 
@@ -791,7 +822,7 @@ void Editor::DrawRopeGuides(sf::RenderTarget& surface){
 
             auto positions = rope.SamplePositions();
 
-            if(i == m_current_tile_layer){
+            if(i == m_current_tile_layer && !only_draw){
                 if(Calc::Distance(rope.start, m_canvas_coordinate) < 8){
                     rope_circle.setFillColor(sf::Color(100,100,255, 150));
                     rope_circle.setOutlineColor(sf::Color(100,100,255));
@@ -846,65 +877,21 @@ void Editor::DrawLightmapGuides(sf::RenderTarget& surface){
 
     surface.clear(sf::Color(100,100,100));
 
-    // draw tiles
-    for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
+    DrawRopeGuides(surface, true);
 
-        sf::VertexArray tile_guides;
-        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
-        
-        sf::Vertex vertex;
-
-        switch(i){
-
-            // collision layer
-            case 0:
-                vertex.color = sf::Color(0,0,0,100);
-                break;
-    
-            case 1: 
-                vertex.color = sf::Color(0,0,0,65);
-                break;
-
-            case 2:
-                vertex.color = sf::Color(0,0,0,35);
-                break;
-        }
-
-        for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
-            for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
-                
-                if(!m_screen_data.m_tile_layers[i][x][y].occupied){
-                    continue;
-                }
-
-                float _x = x * m_screen_data.m_tile_size;
-                float _y = y * m_screen_data.m_tile_size;
-
-                // construct square
-                vertex.position.x = _x;
-                vertex.position.y = _y;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y; 
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-            }
-        }
-        
-        surface.draw(tile_guides);
+    float scaler = 1.0f;
+    if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::LShift)){
+        scaler = 0.1f;
     }
-
+    if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::LAlt)){
+        scaler = -scaler;
+    }
     if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle)){
-        lightmap_sprite_rotation += 1;
-        lightmap_sprite_rotation %= 360;
+        lightmap_sprite_rotation += scaler;
+
+        if(lightmap_sprite_rotation >= 360){
+            lightmap_sprite_rotation -= 360;
+        }
     }
 
 
@@ -934,56 +921,8 @@ void Editor::DrawLightmapGuides(sf::RenderTarget& surface){
 
 void Editor::DrawGenerationGuides(sf::RenderTarget& surface){
 
-    // draw tile guides
-    for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
 
-        sf::VertexArray tile_guides;
-        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
-        
-        sf::Vertex vertex;
-
-        // only show selected layer (to draw materials on)
-        if(i == m_current_tile_layer){
-            vertex.color = sf::Color(0,0,0,150);
-        }
-        else{
-            vertex.color = sf::Color(0,0,0,20);
-        }
-
-        for(int x = 0; x < m_screen_data.m_tile_layers[i].size(); x++){         
-            for(int y = 0; y < m_screen_data.m_tile_layers[i].size(); y++){
-                
-                if(!m_screen_data.m_tile_layers[i][x][y].occupied){
-                    continue;
-                }
-
-                float _x = x * m_screen_data.m_tile_size;
-                float _y = y * m_screen_data.m_tile_size;
-
-
-                // construct square for tile
-                vertex.position.x = _x;
-                vertex.position.y = _y;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y; 
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-            }
-        }
-        
-        surface.draw(tile_guides);
-        tile_guides.clear();
-    }
+    DrawRopeGuides(surface, true);
 
     if(viewing_generation_stack && selected_generation_stack_item >= 0 && selected_generation_stack_item < m_screen_data.m_generation_canvas.size()){
         sf::Texture focused_generation_map;
@@ -994,7 +933,7 @@ void Editor::DrawGenerationGuides(sf::RenderTarget& surface){
     }
 }
 
-void Editor::PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, int brush_size){
+void Editor::PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, int brush_size, bool erase){
 
     if(selected_generation_stack_item < 0 || selected_generation_stack_item >= m_screen_data.m_generation_canvas.size()){
         return;
@@ -1021,19 +960,19 @@ void Editor::PaintToGenerationImage(int pixel_x, int pixel_y, sf::Uint8 amount, 
             }
 
             
-            /*
+            
 
-            float dis = Calc::Distance(sf::Vector2f(0,0), sf::Vector2f(x, y)) / brush_size;
-            dis = Calc::Clamp(dis, 0, 1);
-            float _amount = Calc::Lerp(amount, 0, dis);
+            float dis = Calc::ManhattenDistance(sf::Vector2f(0,0), sf::Vector2f(x, y)) / Calc::ManhattenDistance(sf::Vector2f(0,0), sf::Vector2f(brush_size, brush_size));
+            float _amount = 1.0 - dis * (1/(float)amount);
 
-            int new_amount = round(m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(real_x, real_y).r + _amount);
+            sf::Color previous = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(real_x, real_y);
+
+            int new_amount = std::max((int)round(_amount * (float)255), (int)previous.r);
             new_amount = Calc::Clamp(new_amount, 0, 255);
 
-            m_screen_data.m_generation_canvas[0][m_current_tile_layer].setPixel(real_x, real_y, sf::Color(new_amount, 0, 0, m_screen_data.m_generation_canvas[0][m_current_tile_layer].getPixel(real_x, real_y).a));
-            */
+
            m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->setPixel(
-            real_x, real_y, sf::Color(amount, 0, 0, 
+            real_x, real_y, sf::Color(new_amount, 255 - new_amount, 255 - new_amount, 
             m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(real_x, real_y).a));
         }
     }
@@ -1086,14 +1025,15 @@ void Editor::AverageInbetweenGenerationPoints(int min_x, int max_x, int min_y, i
             sf::Uint8 bot_ceil_col = m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(ceil_x, ceil_y).r;
 
             
-            sf::Uint8 final_col = Calc::Lerp(
+            sf::Uint8 final_intensity = Calc::Lerp(
                 Calc::Lerp(top_floor_col, top_ceil_col, (x - floor_x) / (float)m_screen_data.m_tile_size),
                 Calc::Lerp(bot_floor_col, bot_ceil_col, (x - floor_x) / (float)m_screen_data.m_tile_size),
                 (y - floor_y) / (float)m_screen_data.m_tile_size);
                 
+            final_intensity = top_floor_col;
 
             m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->setPixel(x, y, 
-                        sf::Color(final_col, 0, 0, 
+                        sf::Color(final_intensity, 255 - final_intensity, 255 - final_intensity, 
                                                 m_screen_data.m_generation_canvas[selected_generation_stack_item].m_tile_layer_images[m_current_tile_layer]->getPixel(x,y).a));
 
 
@@ -1101,13 +1041,12 @@ void Editor::AverageInbetweenGenerationPoints(int min_x, int max_x, int min_y, i
     }
 }
 
-void Editor::SetTileMaterial(int tile_x, int tile_y){
+void Editor::SetTileMaterial(int tile_x, int tile_y, bool propogate_to_symetric){
 
     // remove exisiting voxel material if present
     if(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].is_topleft_of_object){
         
         auto voxel_obj = AssetManager::GetVoxelObject(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].voxel_object_index);
-
 
         for(int x = 0; x < voxel_obj.tile_width; x++){
             for(int y = 0; y < voxel_obj.tile_height; y++){
@@ -1117,12 +1056,44 @@ void Editor::SetTileMaterial(int tile_x, int tile_y){
             }
         }
     }
+
+    if(propogate_to_symetric){
+        if(m_symmetric_x){
+            SetTileMaterial(Util::GetSymmetricPositionX(m_screen_data, tile_x), tile_y, false);
+        } 
+        if(m_symmetric_y){
+            SetTileMaterial(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y), false);
+        } 
+        if(m_symmetric_x && m_symmetric_y){
+            SetTileMaterial(Util::GetSymmetricPositionX(m_screen_data, tile_x), Util::GetSymmetricPositionY(m_screen_data, tile_y), false);
+        }
+    }
+
     // set tile
     m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].tile_material_index = selected_material;
 }
-void Editor::SetVoxelObject(int tile_x, int tile_y){
+void Editor::SetVoxelObject(int tile_x, int tile_y, bool propogate_to_symmetric){
     
     auto voxel_obj = AssetManager::GetVoxelObject(selected_material);
+
+    if(!Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
+                                        AssetManager::GetVoxelObject(selected_material).tile_width, 
+                                        AssetManager::GetVoxelObject(selected_material).tile_height, !m_material_creates_geometry)){ 
+        return;
+    }
+
+    if(propogate_to_symmetric){
+        
+        if(m_symmetric_x){
+            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj.tile_width - 1), tile_y, false);
+        } 
+        if(m_symmetric_y){
+            SetVoxelObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj.tile_height - 1), false);
+        } 
+        if(m_symmetric_x && m_symmetric_y){
+            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj.tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj.tile_height - 1), false);
+        }
+    }
 
     // mark each tile with appropriate voxel index
     for(int x = 0; x < voxel_obj.tile_width; x++){
@@ -1137,9 +1108,28 @@ void Editor::SetVoxelObject(int tile_x, int tile_y){
     // mark top corner as origin 
     m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].is_topleft_of_object = true;
 }
-void Editor::SetTileObject(int tile_x, int tile_y){
+void Editor::SetTileObject(int tile_x, int tile_y, bool propogate_to_symmetric){
     
     auto tile_obj = AssetManager::GetTileObject(selected_material);
+
+    if(!Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
+                                    AssetManager::GetTileObject(selected_material).tile_width, 
+                                    AssetManager::GetTileObject(selected_material).tile_height, !m_material_creates_geometry)){
+        return;
+    }
+
+    if(propogate_to_symmetric){
+        
+        if(m_symmetric_x){
+            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj.tile_width - 1), tile_y, false);
+        } 
+        if(m_symmetric_y){
+            SetTileObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj.tile_height - 1), false);
+        } 
+        if(m_symmetric_x && m_symmetric_y){
+            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj.tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj.tile_height - 1), false);
+        }
+    }
 
     // mark each tile with appropriate voxel index
     for(int x = 0; x < tile_obj.tile_width; x++){
@@ -1193,10 +1183,10 @@ void Editor::MouseHandling(){
     if(m_view_mode == TileMode::Generation){
 
         if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
-            PaintToGenerationImage(m_tile_coord.x * m_screen_data.m_tile_size, m_tile_coord.y * m_screen_data.m_tile_size, 255, m_brush_size);
+            PaintToGenerationImage(m_tile_coord.x * m_screen_data.m_tile_size, m_tile_coord.y * m_screen_data.m_tile_size, m_generation_brush_density, m_brush_size, false);
         }
         if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right)){
-            PaintToGenerationImage(m_tile_coord.x * m_screen_data.m_tile_size, m_tile_coord.y * m_screen_data.m_tile_size, 0, m_brush_size);
+            PaintToGenerationImage(m_tile_coord.x * m_screen_data.m_tile_size, m_tile_coord.y * m_screen_data.m_tile_size, -m_generation_brush_density, m_brush_size, true);
         }
     }
 
@@ -1221,21 +1211,18 @@ void Editor::MouseHandling(){
                         }
                         case MaterialSelectionType::VOXEL_OBJECTS: {
                             // drawing voxel
-                            if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && 
-                                Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
-                                                                AssetManager::GetVoxelObject(selected_material).tile_width, 
-                                                                AssetManager::GetVoxelObject(selected_material).tile_height, !m_material_creates_geometry)){ 
+                            if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
+
                                 SetVoxelObject(m_tile_coord.x, m_tile_coord.y);
+                            
+                                break;
                             }
-                            break;
                         }
                         case MaterialSelectionType::TILE_OBJECTS: {
                             auto tile_objects = AssetManager::GetAllTileObjects();
                             // drawing voxel
-                            if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && 
-                                Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
-                                                                AssetManager::GetTileObject(selected_material).tile_width, 
-                                                                AssetManager::GetTileObject(selected_material).tile_height, !m_material_creates_geometry)){
+                            if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
+
                                 SetTileObject(m_tile_coord.x, m_tile_coord.y);
                             }
                             break;
@@ -1344,13 +1331,12 @@ void Editor::CreateRect(bool remove){
 
                     if(m_material_select_type == VOXEL_OBJECTS && 
                         Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, x, y, m_current_tile_layer, width_thresh, height_thresh, !m_material_creates_geometry)){
-                            SetVoxelObject(x, y);
+                            SetVoxelObject(x, y, true);
                     }
                     else if(m_material_select_type == TILE_OBJECTS &&
                         Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, x, y, m_current_tile_layer, width_thresh, height_thresh, !m_material_creates_geometry)){
-                            SetTileObject(x, y);
+                            SetTileObject(x, y, true);
                     }
-
                 }
                 
             
@@ -1404,6 +1390,12 @@ void Editor::DrawEditor(){
         }
     }
 
+    // display the width of the cursor
+    m_text.setPosition(sf::Vector2f(cursor_outline.getPosition().x, cursor_outline.getPosition().y - m_text_spacing));
+    m_text.setColor(sf::Color::White);
+    m_text.setString("");
+
+
     if(m_tile_tool == TileTool::BRUSH || (m_tile_tool == TileTool::RECTANGLE && !m_drawing_place_rect && !m_drawing_remove_rect) ){
         cursor_outline.setSize(sf::Vector2f(m_screen_data.m_tile_size, m_screen_data.m_tile_size));
         cursor_outline.setPosition(m_mouse_position);
@@ -1427,6 +1419,8 @@ void Editor::DrawEditor(){
         
         cursor_outline.setSize(sf::Vector2f(end.x - start.x, end.y - start.y));
         cursor_outline.setPosition(start);
+
+        m_text.setString("" + std::to_string((int)round((end.x - start.x)/ m_screen_data.m_tile_size )) + " x " + std::to_string((int)round((end.y - start.y)/ m_screen_data.m_tile_size)));
     }
 
 
@@ -1460,6 +1454,7 @@ void Editor::DrawEditor(){
 
         m_window.draw(cursor_brush_circle);
     }
+
     if(m_view_mode == TileMode::Material){
 
         // draw object ui
@@ -1469,8 +1464,14 @@ void Editor::DrawEditor(){
             m_window.draw(voxel_obj.sprite_texture);
             
             if(m_tile_tool == TileTool::RECTANGLE && m_drawing_place_rect){
+            
                 m_window.draw(cursor_outline);
             }
+            else{
+                m_text.setString("" + std::to_string(voxel_obj.tile_width) + " x " + std::to_string(voxel_obj.tile_height));
+            }
+
+            
         }
         if(m_material_select_type == TILE_OBJECTS){
             auto tile_obj = AssetManager::GetTileObject(selected_material);
@@ -1480,6 +1481,9 @@ void Editor::DrawEditor(){
             if(m_tile_tool == TileTool::RECTANGLE && m_drawing_place_rect){
                 m_window.draw(cursor_outline);
             }
+            else{
+                m_text.setString("" + std::to_string(tile_obj.tile_width) + " x " + std::to_string(tile_obj.tile_height));
+            }
         }
         if(m_material_select_type == TILE_MATERIALS){
             m_window.draw(cursor_outline);
@@ -1487,6 +1491,7 @@ void Editor::DrawEditor(){
     }
     else if(m_view_mode == TileMode::Generation){
         cursor_brush_circle.setRadius(m_brush_size * m_screen_data.m_tile_size);
+        cursor_brush_circle.setOutlineThickness(m_generation_brush_density);
         cursor_brush_circle.setOrigin(sf::Vector2f(m_brush_size * m_screen_data.m_tile_size, m_brush_size * m_screen_data.m_tile_size));
 
         cursor_brush_circle.setOutlineColor(sf::Color::White);
@@ -1497,17 +1502,43 @@ void Editor::DrawEditor(){
         m_window.draw(cursor_outline);
     }
     
+    m_window.draw(m_text);
 }
 
 void Editor::CatchEvent(const sf::Event& event){
 
     if(event.type == sf::Event::KeyPressed){
+
+        if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::LControl)){
+
+            if(event.key.scancode == sf::Keyboard::Scancode::S){
+
+                Serilizer::SaveScreenData(Serilizer::GetCurrentWorkingFile(), m_screen_data);
+                return;
+            }
+            
+            if(event.key.scancode == sf::Keyboard::Scancode::O){
+
+                Serilizer::OpenSaveFile();
+                return;
+            }
+            // render scene
+            if(event.key.scancode == sf::Keyboard::Scancode::R){
+                m_view_mode = Voxel;
+                Renderer::DrawScreenData(m_screen_data, m_window);
+            }
+
+        }
+
+
+
+
         if(event.key.scancode == sf::Keyboard::Scancode::Escape){
             palette_preview = !palette_preview;
 
             if(palette_preview){
                 palette_preview_texture.loadFromFile("LevelExports/export_main.png");
-                palette_preview_sprite.setTexture(palette_preview_texture);
+                palette_preview_sprite.setTexture(palette_preview_texture, true);
             }
         }
     }
@@ -1541,33 +1572,54 @@ void Editor::CatchEvent(const sf::Event& event){
     // adjusting generation brush size
     if(m_view_mode == TileMode::Generation){
         if(event.type == sf::Event::MouseWheelScrolled){
-            
-            if(event.mouseWheelScroll.delta > 0 && m_brush_size < 20){
-                m_brush_size += 1;
+
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode(sf::Keyboard::Scancode::LShift))){
+                
+                if(event.mouseWheelScroll.delta > 0 && m_generation_brush_density < 6){
+                    m_generation_brush_density += 1;
+                }
+                else if(event.mouseWheelScroll.delta < 0 && m_generation_brush_density > 1){
+                    m_generation_brush_density -= 1;
+                }
             }
-            else if(event.mouseWheelScroll.delta < 0 && m_brush_size > 1){
-                m_brush_size -= 1;
+            else{
+
+                if(event.mouseWheelScroll.delta > 0 && m_brush_size < 20){
+                    m_brush_size += 1;
+                }
+                else if(event.mouseWheelScroll.delta < 0 && m_brush_size > 1){
+                    m_brush_size -= 1;
+                }
+
             }
+
+        
         }
     }
 
     if(m_view_mode == TileMode::Lightmap){
         if(event.type == sf::Event::MouseWheelScrolled){
             
+
+            float factor = 1.0;
             if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode(sf::Keyboard::Scancode::LShift))){
+                factor = 0.1;
+            }
+
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode(sf::Keyboard::Scancode::LAlt))){
                 if(event.mouseWheelScroll.delta > 0){
-                    lightmap_sprite_scale_x += 0.35;
+                    lightmap_sprite_scale_x += 0.35 * factor;
                 }
                 else if(event.mouseWheelScroll.delta < 0){
-                    lightmap_sprite_scale_x -= 0.35;
+                    lightmap_sprite_scale_x -= 0.35 * factor;
                 }
             }
             else{
                 if(event.mouseWheelScroll.delta > 0){
-                    lightmap_sprite_scale_y += 0.35;
+                    lightmap_sprite_scale_y += 0.35 * factor;
                 }
                 else if(event.mouseWheelScroll.delta < 0){
-                    lightmap_sprite_scale_y -= 0.35;
+                    lightmap_sprite_scale_y -= 0.35 * factor;
                 }
             }
         }
@@ -1696,11 +1748,10 @@ void Editor::CatchEvent(const sf::Event& event){
             }
 
             if(m_view_mode == TileMode::Voxel){
-                Renderer::StartRender();
-                Renderer::DrawScreenData(m_screen_data, m_window);
+                //Renderer::StartRender();
             }
             else{
-                Renderer::StopRender();
+                //Renderer::StopRender();
             }
             
         }
@@ -1805,9 +1856,9 @@ void Editor::CatchEvent(const sf::Event& event){
                     m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[1] = new sf::Image;
                     m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[2] = new sf::Image;
 
-                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[0]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
-                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[1]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
-                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[2]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,0,0,170));
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[0]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,255,255,130));
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[1]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,255,255,130));
+                    m_screen_data.m_generation_canvas[new_effect_index].m_tile_layer_images[2]->create(m_screen_data.m_canvas_width, m_screen_data.m_canvas_height, sf::Color(0,255,255,130));
                 
                     selected_generation_stack_item = new_effect_index;
                     viewing_generation_stack = true;

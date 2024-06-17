@@ -49,17 +49,7 @@ class Datafile{
             @param n the Datafile we are saving to 
             @param file_name the file path we are reading from
             @param node_to_stop_at will terminate all reading when this node is reached, allows us to not read the whole file
-            
-            if say our node structure is
-
-            - header {}
-            - world {}
         
-            and we dont want to read anything beyond and including world we can specify the node_to_stop_at as "world"
-
-            making the Read only return
-
-            - header {}
         */
         inline static bool Read(
             Datafile& n,
@@ -170,6 +160,7 @@ class Datafile{
                                 prop_name = line;
 
                                 if(prop_name == node_to_stop_at){
+                                    std::cout << "early exit found, node_to_stop_at, Datafile::Read()\n";
                                     break;
                                 }
                             }
