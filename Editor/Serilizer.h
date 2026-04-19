@@ -6,8 +6,12 @@ class Serilizer {
 
     public: 
 
+        // level editor file
         static void SaveScreenData(std::string saveFile, ScreenData& screen_data);
         static void OpenSaveFile();
+
+        // final render file
+        static void SaveRenderData(std::string saveFile, ScreenData& screen_data);
 
         static std::string GetCurrentWorkingFile(){return currentWorkingFile;}
 

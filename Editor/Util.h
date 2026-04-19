@@ -20,6 +20,59 @@ class Util{
     public:
 
 
+        static TileShape GetSymmetricTileShape(TileShape shape, bool flip_x, bool flip_y){
+            if(shape == TileShape::SOLID){
+                return shape;
+            }
+
+            if(flip_x && flip_y){
+                
+                switch(shape){
+
+                    case TileShape::SLOPE_UPRIGHT:
+                        return SLOPE_DOWNLEFT;    
+                    case TileShape::SLOPE_UPLEFT:
+                        return SLOPE_DOWNRIGHT;    
+                    case TileShape::SLOPE_DOWNRIGHT:
+                        return SLOPE_UPLEFT;    
+                    case TileShape::SLOPE_DOWNLEFT:
+                        return SLOPE_UPRIGHT;    
+                }
+            }
+            if(flip_x){
+                
+                switch(shape){
+
+                    case TileShape::SLOPE_UPRIGHT:
+                        return SLOPE_UPLEFT;    
+                    case TileShape::SLOPE_UPLEFT:
+                        return SLOPE_UPRIGHT;    
+                    case TileShape::SLOPE_DOWNRIGHT:
+                        return SLOPE_DOWNLEFT;    
+                    case TileShape::SLOPE_DOWNLEFT:
+                        return SLOPE_DOWNRIGHT;    
+                }
+            }
+            if(flip_y){
+                switch(shape){
+
+                    case TileShape::SLOPE_UPRIGHT:
+                        return SLOPE_DOWNRIGHT;    
+                    case TileShape::SLOPE_UPLEFT:
+                        return SLOPE_DOWNLEFT;    
+                    case TileShape::SLOPE_DOWNRIGHT:
+                        return SLOPE_UPRIGHT;    
+                    case TileShape::SLOPE_DOWNLEFT:
+                        return SLOPE_UPLEFT;    
+                }
+            }
+        }
+
+
+        static float Random(float min, float max) {
+            return ((float)rand() / RAND_MAX) * (max - min) + min;
+        }
+        
         static bool InCanvasBounds(ScreenData& screen_data, int x, int y){
             if(y < 0 || y >= screen_data.m_canvas_height){
                 return false;
@@ -92,7 +145,7 @@ class Util{
                     y--;
                     // cull top 
                     if(y < screen_data.m_half_tile_height){
-                        return true;
+                        //return true;
                     }
                     break;
 
@@ -100,25 +153,27 @@ class Util{
                     x--;
                     // cull left 
                     if(x < screen_data.m_half_tile_width){
-                        return true;
+                        //return true;
                     }
                     break;
 
                 case FACE_BOTTOM:
                     y++;
 
+                    return true;
                     // cull left 
                     if(y > screen_data.m_half_tile_height){
-                        return true;
+                        //return true;
                     }
                     break;
                 
                 case FACE_RIGHT:
 
                     x++;
+                    return true;
                     // cull left 
                     if(x > screen_data.m_half_tile_width){
-                        return true;
+                        //return true;
                     }
                     break;    
             }
@@ -143,7 +198,7 @@ class Util{
                     y--;
                     // cull top 
                     if(y < screen_data.m_half_canvas_height){
-                        return true;
+                        //return true;
                     }
                     break;
 
@@ -151,25 +206,26 @@ class Util{
                     x--;
                     // cull left 
                     if(x < screen_data.m_half_canvas_width){
-                        return true;
+                        //return true;
                     }
                     break;
 
                 case FACE_BOTTOM:
                     y++;
-
+                    return true;
                     // cull left 
                     if(y > screen_data.m_half_canvas_height){
-                        return true;
+                        //return true;
                     }
                     break;
                 
                 case FACE_RIGHT:
 
                     x++;
+                    return true;
                     // cull left 
                     if(x > screen_data.m_half_canvas_width){
-                        return true;
+                        //return true;
                     }
                     break;    
             }
@@ -237,7 +293,7 @@ class Util{
         static sf::Vector2f ShiftVertexOnPerspectiveAxis(sf::Vector2f position, const ScreenData& screen_data, float z_position, bool _floor = true, bool invert_shift = false){
             
             float distance = Calc::Distance(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height));
-            sf::Vector2f shift = Calc::VectorBetween(position, sf::Vector2f(screen_data.m_half_canvas_width, screen_data.m_half_canvas_height)) * distance * z_position;
+            sf::Vector2f shift = sf::Vector2f(-1, -1) * z_position;
             sf::Vector2f final;
 
             if(invert_shift){

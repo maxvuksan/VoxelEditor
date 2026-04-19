@@ -26,7 +26,7 @@ void Editor::Start(){
             "solid_colour.a = 1.0;"\
 
 
-            "gl_FragColor = mix(solid_colour, fog_colour, (1.0 - sampled_pixel.a * sampled_pixel.a));"\
+            "gl_FragColor = mix(solid_colour, fog_colour, max(1.0 - sampled_pixel.a * sampled_pixel.a, 0.0));"\
         "}";
 
     if(!m_colour_level_shader.loadFromMemory(frag_shader, sf::Shader::Fragment)){
@@ -61,7 +61,7 @@ void Editor::Start(){
 
     // should be even?
 
-    m_screen_data.Create(100, 48, 16, 8);
+    m_screen_data.Create(46, 40, 22, 8);
 
     canvas_outline.setOutlineColor(sf::Color::White);
     canvas_outline.setOutlineThickness(1);
@@ -85,6 +85,7 @@ void Editor::Start(){
     rope_position_being_moved = nullptr;
     rope_being_created = nullptr;
 
+    m_tile_shape = 0;
     m_brush_size = 1;
     selected_palette = 0;
     m_generation_brush_density = 1;
@@ -218,6 +219,51 @@ void Editor::DrawEditorText(){
     m_text.setPosition(sf::Vector2f(m_text_spacing, m_text_spacing * 9));
     m_window.draw(m_text);
 
+
+    if(m_view_mode == TileMode::Tiles){
+
+        m_text.setString("(E/D) Tile Type");
+        m_text.setPosition(sf::Vector2f(260, m_text_spacing ));
+        m_window.draw(m_text);
+
+        for(int i = 0; i < NUMBER_OF_TILE_SHAPES; i++){
+
+            switch(i){
+
+
+                case TileShape::SOLID: {
+                    m_text.setString("Solid");
+                    break;
+                }
+                case TileShape::SLOPE_UPRIGHT: {
+                    m_text.setString("Slope Up Right");
+                    break;
+                }    
+                case TileShape::SLOPE_UPLEFT: {
+                    m_text.setString("Slope Up Left");
+                    break;
+                }
+                case TileShape::SLOPE_DOWNRIGHT: {
+                    m_text.setString("Slope Down Right");
+                    break;
+                }    
+                case TileShape::SLOPE_DOWNLEFT: {
+                    m_text.setString("Slope Down Left");
+                    break;
+                }
+            }
+            
+            if(i == m_tile_shape){
+                m_text.setColor(sf::Color::Green);
+            }
+            else{
+                m_text.setColor(sf::Color::White);
+            }
+            m_text.setPosition(sf::Vector2f(260, m_text_spacing * (i + 3) ));
+            m_window.draw(m_text);
+        }
+
+    }
 
 
     m_text.setColor(sf::Color::White);
@@ -510,12 +556,107 @@ void Editor::DrawEditorText(){
 }
 
 
+void Editor::AppendTileShapeVerticies(sf::VertexArray& va, float _x, float _y, TileShape shape, sf::Color colour){
+
+    sf::Vertex vertex;
+    vertex.color = colour;
+
+    switch(shape){
+
+        case TileShape::SOLID: {
+            // construct square for tile
+            vertex.position.x = _x;
+            vertex.position.y = _y;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y; 
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x;
+            vertex.position.y = _y;
+            va.append(vertex);
+            break;
+        }
+        case TileShape::SLOPE_UPRIGHT: {
+            vertex.position.x = _x;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y; 
+            va.append(vertex);
+            break;
+        }
+    
+        case TileShape::SLOPE_UPLEFT: {
+            vertex.position.x = _x;
+            vertex.position.y = _y;
+            va.append(vertex);
+
+            vertex.position.x = _x;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y + m_screen_data.m_tile_size; 
+            va.append(vertex);
+            break;
+        }
+        case TileShape::SLOPE_DOWNRIGHT: {
+            vertex.position.x = _x;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x;
+            vertex.position.y = _y;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y; 
+            va.append(vertex);
+            break;
+        }
+        case TileShape::SLOPE_DOWNLEFT: {
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y + m_screen_data.m_tile_size;
+            va.append(vertex);
+
+            vertex.position.x = _x + m_screen_data.m_tile_size;
+            vertex.position.y = _y;
+            va.append(vertex);
+
+            vertex.position.x = _x;
+            vertex.position.y = _y; 
+            va.append(vertex);
+            break;
+        }                
+    }
+
+}
+
 void Editor::DrawTileGuides(sf::RenderTarget& surface){
 
     for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
 
         sf::VertexArray tile_guides;
-        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
+        tile_guides.setPrimitiveType(sf::PrimitiveType::Triangles);
         
         sf::Vertex vertex;
 
@@ -545,22 +686,8 @@ void Editor::DrawTileGuides(sf::RenderTarget& surface){
                 float _x = x * m_screen_data.m_tile_size;
                 float _y = y * m_screen_data.m_tile_size;
 
-                // construct square
-                vertex.position.x = _x;
-                vertex.position.y = _y;
-                tile_guides.append(vertex);
+                AppendTileShapeVerticies(tile_guides, _x, _y, m_screen_data.m_tile_layers[i][x][y].shape, vertex.color);
 
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y; 
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
             }
         }
         
@@ -571,12 +698,14 @@ void Editor::DrawTileGuides(sf::RenderTarget& surface){
 
 void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_nodes){
 
-    int quarter_tile_size = m_screen_data.m_tile_size / 4.0f;
+    int quarter_tile_size = m_screen_data.m_tile_size / 3.0f;
 
     for(int i = 0; i < m_screen_data.m_tile_layers.size(); i++){
 
+        sf::VertexArray tile_material_guides;
+        tile_material_guides.setPrimitiveType(sf::PrimitiveType::Quads);      
         sf::VertexArray tile_guides;
-        tile_guides.setPrimitiveType(sf::PrimitiveType::Quads);
+        tile_guides.setPrimitiveType(sf::PrimitiveType::Triangles);
 
         sf::Vertex vertex;
 
@@ -599,22 +728,8 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_no
                 }
 
 
-                // construct square for tile
-                vertex.position.x = _x;
-                vertex.position.y = _y;
-                tile_guides.append(vertex);
 
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y; 
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x + m_screen_data.m_tile_size;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
-
-                vertex.position.x = _x;
-                vertex.position.y = _y + m_screen_data.m_tile_size;
-                tile_guides.append(vertex);
+                AppendTileShapeVerticies(tile_guides, _x, _y, m_screen_data.m_tile_layers[i][x][y].shape, vertex.color);
 
             }
         }
@@ -654,26 +769,26 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_no
 
                         vertex.position.x = _x;
                         vertex.position.y = _y;
-                        vertex.texCoords.x = voxel_obj.texture_atlas_position_x; 
-                        vertex.texCoords.y = voxel_obj.texture_atlas_position_y;
+                        vertex.texCoords.x = voxel_obj->texture_atlas_position_x; 
+                        vertex.texCoords.y = voxel_obj->texture_atlas_position_y;
                         object_guides.append(vertex);
 
-                        vertex.position.x = _x + voxel_obj.layer_width;
+                        vertex.position.x = _x + voxel_obj->layer_width;
                         vertex.position.y = _y;
-                        vertex.texCoords.x = voxel_obj.texture_atlas_position_x + voxel_obj.layer_width; 
-                        vertex.texCoords.y = voxel_obj.texture_atlas_position_y;
+                        vertex.texCoords.x = voxel_obj->texture_atlas_position_x + voxel_obj->layer_width; 
+                        vertex.texCoords.y = voxel_obj->texture_atlas_position_y;
                         object_guides.append(vertex);
 
-                        vertex.position.x = _x + voxel_obj.layer_width;
-                        vertex.position.y = _y + voxel_obj.layer_height;
-                        vertex.texCoords.x = voxel_obj.texture_atlas_position_x + voxel_obj.layer_width; 
-                        vertex.texCoords.y = voxel_obj.texture_atlas_position_y + voxel_obj.layer_height; 
+                        vertex.position.x = _x + voxel_obj->layer_width;
+                        vertex.position.y = _y + voxel_obj->layer_height;
+                        vertex.texCoords.x = voxel_obj->texture_atlas_position_x + voxel_obj->layer_width; 
+                        vertex.texCoords.y = voxel_obj->texture_atlas_position_y + voxel_obj->layer_height; 
                         object_guides.append(vertex);
 
                         vertex.position.x = _x;
-                        vertex.position.y = _y + voxel_obj.layer_height;
-                        vertex.texCoords.x = voxel_obj.texture_atlas_position_x;
-                        vertex.texCoords.y = voxel_obj.texture_atlas_position_y + voxel_obj.layer_height; 
+                        vertex.position.y = _y + voxel_obj->layer_height;
+                        vertex.texCoords.x = voxel_obj->texture_atlas_position_x;
+                        vertex.texCoords.y = voxel_obj->texture_atlas_position_y + voxel_obj->layer_height; 
                         object_guides.append(vertex);
                     }
                 } 
@@ -685,28 +800,28 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_no
 
                         auto tile_obj = AssetManager::GetTileObject(m_screen_data.m_tile_layers[i][x][y].tile_object_index);
 
-                        vertex.position.x = _x;
+                        vertex.position.x = _x;     
                         vertex.position.y = _y;
-                        vertex.texCoords.x = tile_obj.texture_atlas_position_x; 
-                        vertex.texCoords.y = tile_obj.texture_atlas_position_y;
+                        vertex.texCoords.x = tile_obj->texture_atlas_position_x; 
+                        vertex.texCoords.y = tile_obj->texture_atlas_position_y;
                         object_guides.append(vertex);
 
-                        vertex.position.x = _x + tile_obj.layer_width;
+                        vertex.position.x = _x + tile_obj->layer_width;
                         vertex.position.y = _y;
-                        vertex.texCoords.x = tile_obj.texture_atlas_position_x + tile_obj.layer_width; 
-                        vertex.texCoords.y = tile_obj.texture_atlas_position_y;
+                        vertex.texCoords.x = tile_obj->texture_atlas_position_x + tile_obj->layer_width; 
+                        vertex.texCoords.y = tile_obj->texture_atlas_position_y;
                         object_guides.append(vertex);
 
-                        vertex.position.x = _x + tile_obj.layer_width;
-                        vertex.position.y = _y + tile_obj.layer_height;
-                        vertex.texCoords.x = tile_obj.texture_atlas_position_x + tile_obj.layer_width; 
-                        vertex.texCoords.y = tile_obj.texture_atlas_position_y + tile_obj.layer_height; 
+                        vertex.position.x = _x + tile_obj->layer_width;
+                        vertex.position.y = _y + tile_obj->layer_height;
+                        vertex.texCoords.x = tile_obj->texture_atlas_position_x + tile_obj->layer_width; 
+                        vertex.texCoords.y = tile_obj->texture_atlas_position_y + tile_obj->layer_height; 
                         object_guides.append(vertex);
 
                         vertex.position.x = _x;
-                        vertex.position.y = _y + tile_obj.layer_height;
-                        vertex.texCoords.x = tile_obj.texture_atlas_position_x;
-                        vertex.texCoords.y = tile_obj.texture_atlas_position_y + tile_obj.layer_height; 
+                        vertex.position.y = _y + tile_obj->layer_height;
+                        vertex.texCoords.x = tile_obj->texture_atlas_position_x;
+                        vertex.texCoords.y = tile_obj->texture_atlas_position_y + tile_obj->layer_height; 
                         object_guides.append(vertex);
                     }
                 }
@@ -718,24 +833,25 @@ void Editor::DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_no
                     // construct square for material
                     vertex.position.x = _x + quarter_tile_size;
                     vertex.position.y = _y + quarter_tile_size;
-                    tile_guides.append(vertex);
+                    tile_material_guides.append(vertex);
 
                     vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
                     vertex.position.y = _y + quarter_tile_size; 
-                    tile_guides.append(vertex);
+                    tile_material_guides.append(vertex);
 
                     vertex.position.x = _x + m_screen_data.m_tile_size - quarter_tile_size;
                     vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
-                    tile_guides.append(vertex);
+                    tile_material_guides.append(vertex);
 
                     vertex.position.x = _x + quarter_tile_size;
                     vertex.position.y = _y + m_screen_data.m_tile_size - quarter_tile_size;
-                    tile_guides.append(vertex);
+                    tile_material_guides.append(vertex);
                 }
             }
         }
         
         surface.draw(tile_guides);
+        surface.draw(tile_material_guides);
 
         /*
 
@@ -1046,16 +1162,29 @@ void Editor::SetTileMaterial(int tile_x, int tile_y, bool propogate_to_symetric)
     // remove exisiting voxel material if present
     if(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].is_topleft_of_object){
         
-        auto voxel_obj = AssetManager::GetVoxelObject(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].voxel_object_index);
+        if(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].voxel_object_index > -1){
+            auto voxel_obj = AssetManager::GetVoxelObject(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].voxel_object_index);
 
-        for(int x = 0; x < voxel_obj.tile_width; x++){
-            for(int y = 0; y < voxel_obj.tile_height; y++){
+            for(int x = 0; x < voxel_obj->tile_width; x++){
+                for(int y = 0; y < voxel_obj->tile_height; y++){
 
-                m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + x].voxel_object_index = -1;
-                m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + y][tile_y + y].is_topleft_of_object = false;
+                    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].voxel_object_index = -1;
+                    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].is_topleft_of_object = false;
+                }
             }
         }
-    }
+        if(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].tile_object_index > -1){
+            auto tile_obj = AssetManager::GetTileObject(m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].tile_object_index);
+
+            for(int x = 0; x < tile_obj->tile_width; x++){
+                for(int y = 0; y < tile_obj->tile_height; y++){
+
+                    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].tile_object_index = -1;
+                    m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].is_topleft_of_object = false;
+                }
+            }
+        }
+    } 
 
     if(propogate_to_symetric){
         if(m_symmetric_x){
@@ -1071,33 +1200,38 @@ void Editor::SetTileMaterial(int tile_x, int tile_y, bool propogate_to_symetric)
 
     // set tile
     m_screen_data.m_tile_layers[m_current_tile_layer][tile_x][tile_y].tile_material_index = selected_material;
+
 }
 void Editor::SetVoxelObject(int tile_x, int tile_y, bool propogate_to_symmetric){
     
     auto voxel_obj = AssetManager::GetVoxelObject(selected_material);
 
+    if(voxel_obj == nullptr){
+        return;
+    }
+
     if(!Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
-                                        AssetManager::GetVoxelObject(selected_material).tile_width, 
-                                        AssetManager::GetVoxelObject(selected_material).tile_height, !m_material_creates_geometry)){ 
+                                        voxel_obj->tile_width, 
+                                        voxel_obj->tile_height, !m_material_creates_geometry)){ 
         return;
     }
 
     if(propogate_to_symmetric){
         
         if(m_symmetric_x){
-            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj.tile_width - 1), tile_y, false);
+            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj->tile_width - 1), tile_y, false);
         } 
         if(m_symmetric_y){
-            SetVoxelObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj.tile_height - 1), false);
+            SetVoxelObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj->tile_height - 1), false);
         } 
         if(m_symmetric_x && m_symmetric_y){
-            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj.tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj.tile_height - 1), false);
+            SetVoxelObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + voxel_obj->tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + voxel_obj->tile_height - 1), false);
         }
     }
 
     // mark each tile with appropriate voxel index
-    for(int x = 0; x < voxel_obj.tile_width; x++){
-        for(int y = 0; y < voxel_obj.tile_height; y++){
+    for(int x = 0; x < voxel_obj->tile_width; x++){
+        for(int y = 0; y < voxel_obj->tile_height; y++){
 
             m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].occupied = true;
             m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].voxel_object_index = selected_material;
@@ -1111,29 +1245,32 @@ void Editor::SetVoxelObject(int tile_x, int tile_y, bool propogate_to_symmetric)
 void Editor::SetTileObject(int tile_x, int tile_y, bool propogate_to_symmetric){
     
     auto tile_obj = AssetManager::GetTileObject(selected_material);
+    if(tile_obj == nullptr){
+        return;
+    }
 
     if(!Util::ValidateVoxelObjectFitsTileGrid(m_screen_data, m_tile_coord.x, m_tile_coord.y, m_current_tile_layer, 
-                                    AssetManager::GetTileObject(selected_material).tile_width, 
-                                    AssetManager::GetTileObject(selected_material).tile_height, !m_material_creates_geometry)){
+                                    tile_obj->tile_width, 
+                                    tile_obj->tile_height, !m_material_creates_geometry)){
         return;
     }
 
     if(propogate_to_symmetric){
         
         if(m_symmetric_x){
-            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj.tile_width - 1), tile_y, false);
+            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj->tile_width - 1), tile_y, false);
         } 
         if(m_symmetric_y){
-            SetTileObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj.tile_height - 1), false);
+            SetTileObject(tile_x, Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj->tile_height - 1), false);
         } 
         if(m_symmetric_x && m_symmetric_y){
-            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj.tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj.tile_height - 1), false);
+            SetTileObject(Util::GetSymmetricPositionX(m_screen_data, tile_x + tile_obj->tile_width - 1), Util::GetSymmetricPositionY(m_screen_data, tile_y + tile_obj->tile_height - 1), false);
         }
     }
 
     // mark each tile with appropriate voxel index
-    for(int x = 0; x < tile_obj.tile_width; x++){
-        for(int y = 0; y < tile_obj.tile_height; y++){
+    for(int x = 0; x < tile_obj->tile_width; x++){
+        for(int y = 0; y < tile_obj->tile_height; y++){
             m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].occupied = true;
             m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].tile_object_index = selected_material;
             m_screen_data.m_tile_layers[m_current_tile_layer][tile_x + x][tile_y + y].is_topleft_of_object = false;
@@ -1233,12 +1370,12 @@ void Editor::MouseHandling(){
                 else if(m_view_mode == TileMode::Tiles){ // we are editing tiles
                     if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)){
                         // set tile
-                        SetTileOccupied(m_tile_coord.x, m_tile_coord.y, true);
+                        SetTileOccupied(m_tile_coord.x, m_tile_coord.y, true, (TileShape)m_tile_shape);
 
                     }
                     else if(sf::Mouse::isButtonPressed(sf::Mouse::Button::Right)){
                         // remove tile
-                        SetTileOccupied(m_tile_coord.x, m_tile_coord.y, false);
+                        SetTileOccupied(m_tile_coord.x, m_tile_coord.y, false, (TileShape)m_tile_shape);
                     }
                 }
             }
@@ -1246,18 +1383,22 @@ void Editor::MouseHandling(){
     }
 }
 
-void Editor::SetTileOccupied(int x, int y, bool occupied){
+void Editor::SetTileOccupied(int x, int y, bool occupied, TileShape shape){
     m_screen_data.m_tile_layers[m_current_tile_layer][x][y].occupied = occupied;
+    m_screen_data.m_tile_layers[m_current_tile_layer][x][y].shape = (TileShape)shape;
 
     // should we set in the opposing sides? (symmetry)
     if(m_symmetric_x && m_symmetric_y){
         m_screen_data.m_tile_layers[m_current_tile_layer][Util::GetSymmetricPositionX(m_screen_data, x)][Util::GetSymmetricPositionY(m_screen_data, y)].occupied = occupied;
+        m_screen_data.m_tile_layers[m_current_tile_layer][Util::GetSymmetricPositionX(m_screen_data, x)][Util::GetSymmetricPositionY(m_screen_data, y)].shape = Util::GetSymmetricTileShape(shape, true, true);
     }
     if(m_symmetric_x){
         m_screen_data.m_tile_layers[m_current_tile_layer][Util::GetSymmetricPositionX(m_screen_data, x)][y].occupied = occupied;
+        m_screen_data.m_tile_layers[m_current_tile_layer][Util::GetSymmetricPositionX(m_screen_data, x)][y].shape = Util::GetSymmetricTileShape(shape, true, false);
     }
     if(m_symmetric_y){
         m_screen_data.m_tile_layers[m_current_tile_layer][x][Util::GetSymmetricPositionY(m_screen_data, y)].occupied = occupied;
+        m_screen_data.m_tile_layers[m_current_tile_layer][x][Util::GetSymmetricPositionY(m_screen_data, y)].shape = Util::GetSymmetricTileShape(shape, false, true);
     }
 }
 
@@ -1289,21 +1430,21 @@ void Editor::CreateRect(bool remove){
             return;
         }
 
-        VoxelObject voxel_object;
-        TileObject tile_object;
+        VoxelObject* voxel_object;
+        TileObject* tile_object;
 
         int width_thresh = 0;
         int height_thresh = 0;
 
         if(m_material_select_type == VOXEL_OBJECTS){
             voxel_object = AssetManager::GetVoxelObject(selected_material);
-            width_thresh = voxel_object.tile_width;
-            height_thresh = voxel_object.tile_height;
+            width_thresh = voxel_object->tile_width;
+            height_thresh = voxel_object->tile_height;
         }
         else if(m_material_select_type == TILE_OBJECTS){
             tile_object = AssetManager::GetTileObject(selected_material);
-            width_thresh = tile_object.tile_width;
-            height_thresh = tile_object.tile_height;
+            width_thresh = tile_object->tile_width;
+            height_thresh = tile_object->tile_height;
         }
 
         int width_increment = 0;
@@ -1338,26 +1479,117 @@ void Editor::CreateRect(bool remove){
                             SetTileObject(x, y, true);
                     }
                 }
-                
             
 
                 height_increment++;
-                // only allow rectangle tool on 1x1 voxel materials
-                //else if(m_material_select_type == VOXEL_OBJECTS && voxel_objects[selected_material]->tile_height == 1 && voxel_objects[selected_material]->tile_width == 1){
-                //    SetVoxelObject(x, y);
-                //}
-                //else if(m_material_select_type == TILE_OBJECTS && tile_objects[selected_material]->tile_height == 1 && tile_objects[selected_material]->tile_width == 1){
-                //    SetTileObject(x, y);
-                //}
             }
             width_increment++;
         }
     }
-    else{ // we are drawing tiles
-        for(int x = start.x; x < end.x; x++){
-            for(int y = start.y; y < end.y; y++){
+    else if(m_view_mode == TileMode::Tiles){ // we are drawing tiles
+        
+        if(m_tile_shape == TileShape::SOLID || remove){
+            for(int x = start.x; x < end.x; x++){
+                for(int y = start.y; y < end.y; y++){
 
-                SetTileOccupied(x, y, !remove);
+                    SetTileOccupied(x, y, !remove, (TileShape)m_tile_shape);
+                }
+            }
+        }
+        else{
+            switch(m_tile_shape){
+
+                case TileShape::SLOPE_UPRIGHT: {
+
+                    int stepCount = end.x - start.x - 1;
+
+                    for(int x = start.x; x < end.x; x++){
+                        for(int y = start.y; y < end.y; y++){
+
+                            int rel_x = x - start.x;
+                            int rel_y = y - start.y;
+
+                            if(rel_y == stepCount){
+                                SetTileOccupied(x, y, true, SLOPE_UPRIGHT);
+                            }
+                            else if(rel_y > stepCount){
+                                SetTileOccupied(x, y, true, SOLID);
+                            }
+                        }
+                        stepCount -= 1;
+                    }
+
+                    break;
+                }
+                case TileShape::SLOPE_UPLEFT: {
+
+                    int stepCount = 0;
+
+                    for(int x = start.x; x < end.x; x++){
+                        for(int y = start.y; y < end.y; y++){
+
+                            int rel_x = x - start.x;
+                            int rel_y = y - start.y;
+
+                            if(rel_y == stepCount){
+                                SetTileOccupied(x, y, true, SLOPE_UPLEFT);
+                            }
+                            else if(rel_y > stepCount){
+                                SetTileOccupied(x, y, true, SOLID);
+                            }
+                        }
+                        stepCount += 1;
+                    }
+
+                    break;
+                }
+                
+                case TileShape::SLOPE_DOWNRIGHT: {
+
+                    int stepCount = end.x - start.x - 1;
+
+                    for(int x = start.x; x < end.x; x++){
+                        for(int y = start.y; y < end.y; y++){
+
+                            int rel_x = x - start.x;
+                            int rel_y = y - start.y;
+
+                            if(rel_y == stepCount){
+                                SetTileOccupied(x, y, true, SLOPE_DOWNRIGHT);
+                            }
+                            else if(rel_y < stepCount){
+                                SetTileOccupied(x, y, true, SOLID);
+                            }
+                        }
+                        stepCount -= 1;
+                    }
+
+                    break;
+                }
+                case TileShape::SLOPE_DOWNLEFT: {
+
+                    int stepCount = 0;
+
+                    for(int x = start.x; x < end.x; x++){
+                        for(int y = start.y; y < end.y; y++){
+
+                            int rel_x = x - start.x;
+                            int rel_y = y - start.y;
+
+                            if(rel_y == stepCount){
+                                SetTileOccupied(x, y, true, SLOPE_DOWNLEFT);
+                            }
+                            else if(rel_y < stepCount){
+                                SetTileOccupied(x, y, true, SOLID);
+                            }
+                        }
+                        stepCount += 1;
+                    }
+
+                    break;
+                }
+            
+            
             }
         }
     }
@@ -1399,8 +1631,8 @@ void Editor::DrawEditor(){
     if(m_tile_tool == TileTool::BRUSH || (m_tile_tool == TileTool::RECTANGLE && !m_drawing_place_rect && !m_drawing_remove_rect) ){
         cursor_outline.setSize(sf::Vector2f(m_screen_data.m_tile_size, m_screen_data.m_tile_size));
         cursor_outline.setPosition(m_mouse_position);
-    
     }
+    
     else if(m_drawing_place_rect || m_drawing_remove_rect){
 
         sf::Vector2f start = m_mouse_position_inital;
@@ -1446,6 +1678,165 @@ void Editor::DrawEditor(){
     
     m_window.draw(canvas_sprite);
 
+    if(m_view_mode == TileMode::Tiles){
+
+        sf::VertexArray va;
+        va.setPrimitiveType(sf::Triangles);
+
+
+        if(m_drawing_place_rect){
+
+            sf::Vector2i start = m_tile_coord_inital;
+            sf::Vector2i end = m_tile_coord;
+
+            if(start.x > end.x){
+                int temp = start.x;
+                start.x = end.x;
+                end.x = temp;
+            }
+            if(start.y > end.y){
+                int temp = start.y;
+                start.y = end.y;
+                end.y = temp;
+            }
+
+            start.x = Calc::Clamp(start.x, 0, m_screen_data.m_tile_layers[m_current_tile_layer].size());
+            start.y = Calc::Clamp(start.y, 0, m_screen_data.m_tile_layers[m_current_tile_layer][0].size());
+            end.x = Calc::Clamp(end.x, 0, m_screen_data.m_tile_layers[m_current_tile_layer].size());
+            end.y = Calc::Clamp(end.y, 0, m_screen_data.m_tile_layers[m_current_tile_layer][0].size());
+
+            // take slope into account
+            if(sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::LShift) && m_tile_shape != TileShape::SOLID){
+
+                switch(m_tile_shape){
+
+                    case TileShape::SLOPE_UPRIGHT: {
+
+                        int stepCount = end.x - start.x - 1;
+
+                        for(int x = start.x; x < end.x; x++){
+                            for(int y = start.y; y < end.y; y++){
+
+                                float _x = canvas_sprite.getGlobalBounds().left + x * m_screen_data.m_tile_size;
+                                float _y = canvas_sprite.getGlobalBounds().top + y * m_screen_data.m_tile_size;
+                                                
+                                int rel_x = x - start.x;
+                                int rel_y = y - start.y;
+
+                                if(rel_y == stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SLOPE_UPRIGHT, sf::Color(255,255,255,140));
+                                }
+                                else if(rel_y > stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SOLID, sf::Color(255,255,255,140));
+                                }
+                            }
+                            stepCount -= 1;
+                        }
+
+                        break;
+                    }
+                    case TileShape::SLOPE_UPLEFT: {
+
+                        int stepCount = 0;
+
+                        for(int x = start.x; x < end.x; x++){
+                            for(int y = start.y; y < end.y; y++){
+
+                                float _x = canvas_sprite.getGlobalBounds().left + x * m_screen_data.m_tile_size;
+                                float _y = canvas_sprite.getGlobalBounds().top + y * m_screen_data.m_tile_size;
+                                                
+                                int rel_x = x - start.x;
+                                int rel_y = y - start.y;
+
+                                if(rel_y == stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SLOPE_UPLEFT, sf::Color(255,255,255,140));
+                                }
+                                else if(rel_y > stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SOLID, sf::Color(255,255,255,140));
+                                }
+                            }
+                            stepCount += 1;
+                        }
+
+                        break;
+                    }
+                    
+                    case TileShape::SLOPE_DOWNRIGHT: {
+
+                        int stepCount = end.x - start.x - 1;
+
+                        for(int x = start.x; x < end.x; x++){
+                            for(int y = start.y; y < end.y; y++){
+
+                                float _x = canvas_sprite.getGlobalBounds().left + x * m_screen_data.m_tile_size;
+                                float _y = canvas_sprite.getGlobalBounds().top + y * m_screen_data.m_tile_size;
+                                                
+                                int rel_x = x - start.x;
+                                int rel_y = y - start.y;
+
+                                if(rel_y == stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SLOPE_DOWNRIGHT, sf::Color(255,255,255,140));
+                                }
+                                else if(rel_y < stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SOLID, sf::Color(255,255,255,140));
+                                }
+                            }
+                            stepCount -= 1;
+                        }
+
+                        break;
+                    }
+                    case TileShape::SLOPE_DOWNLEFT: {
+
+                        int stepCount = 0;
+
+                        for(int x = start.x; x < end.x; x++){
+                            for(int y = start.y; y < end.y; y++){
+
+                                float _x = canvas_sprite.getGlobalBounds().left + x * m_screen_data.m_tile_size;
+                                float _y = canvas_sprite.getGlobalBounds().top + y * m_screen_data.m_tile_size;
+                                                
+                                int rel_x = x - start.x;
+                                int rel_y = y - start.y;
+
+                                if(rel_y == stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SLOPE_DOWNLEFT, sf::Color(255,255,255,140));
+                                }
+                                else if(rel_y < stepCount){
+                                    AppendTileShapeVerticies(va, _x, _y, SOLID, sf::Color(255,255,255,140));
+                                }
+                            }
+                            stepCount += 1;
+                        }
+
+                        break;
+                    }
+                
+                
+                }
+            } // fill regularly 
+            else{
+                for(int x = start.x; x < end.x; x++){
+                    for(int y = start.y; y < end.y; y++){
+
+                        float _x = canvas_sprite.getGlobalBounds().left + x * m_screen_data.m_tile_size;
+                        float _y = canvas_sprite.getGlobalBounds().top + y * m_screen_data.m_tile_size;
+                                        
+                        AppendTileShapeVerticies(va, _x, _y, (TileShape)m_tile_shape, sf::Color(255,255,255,140));
+                    }
+                }
+            }
+
+
+
+        }
+        else{
+            AppendTileShapeVerticies(va, cursor_outline.getPosition().x, cursor_outline.getPosition().y, (TileShape)m_tile_shape, sf::Color(255,255,255,140));
+        }
+
+        m_window.draw(va);
+    }
+
     if(m_view_mode == TileMode::Rope){
         cursor_brush_circle.setRadius(2);
         cursor_brush_circle.setOrigin(sf::Vector2f(2, 2));
@@ -1460,29 +1851,29 @@ void Editor::DrawEditor(){
         // draw object ui
         if(m_material_select_type == VOXEL_OBJECTS){
             auto voxel_obj = AssetManager::GetVoxelObject(selected_material);
-            voxel_obj.sprite_texture.setPosition(m_mouse_position);
-            m_window.draw(voxel_obj.sprite_texture);
+            voxel_obj->sprite_texture.setPosition(m_mouse_position);
+            m_window.draw(voxel_obj->sprite_texture);
             
             if(m_tile_tool == TileTool::RECTANGLE && m_drawing_place_rect){
             
                 m_window.draw(cursor_outline);
             }
             else{
-                m_text.setString("" + std::to_string(voxel_obj.tile_width) + " x " + std::to_string(voxel_obj.tile_height));
+                m_text.setString("" + std::to_string(voxel_obj->tile_width) + " x " + std::to_string(voxel_obj->tile_height));
             }
 
             
         }
         if(m_material_select_type == TILE_OBJECTS){
             auto tile_obj = AssetManager::GetTileObject(selected_material);
-            tile_obj.sprite_texture.setPosition(m_mouse_position);
-            m_window.draw(tile_obj.sprite_texture);
+            tile_obj->sprite_texture.setPosition(m_mouse_position);
+            m_window.draw(tile_obj->sprite_texture);
 
             if(m_tile_tool == TileTool::RECTANGLE && m_drawing_place_rect){
                 m_window.draw(cursor_outline);
             }
             else{
-                m_text.setString("" + std::to_string(tile_obj.tile_width) + " x " + std::to_string(tile_obj.tile_height));
+                m_text.setString("" + std::to_string(tile_obj->tile_width) + " x " + std::to_string(tile_obj->tile_height));
             }
         }
         if(m_material_select_type == TILE_MATERIALS){
@@ -1567,6 +1958,8 @@ void Editor::CatchEvent(const sf::Event& event){
         // return !!!!!!!!!!!!!!!
         return;
     }
+
+
 
 
     // adjusting generation brush size
@@ -1780,6 +2173,21 @@ void Editor::CatchEvent(const sf::Event& event){
             }
         }
 
+        if(m_view_mode == TileMode::Tiles){
+
+            if(event.key.scancode == sf::Keyboard::Scancode::E){
+                m_tile_shape--;
+                if(m_tile_shape < 0){
+                    m_tile_shape = NUMBER_OF_TILE_SHAPES - 1;
+                }
+            }
+            if(event.key.scancode == sf::Keyboard::Scancode::D){
+                m_tile_shape++;
+                if(m_tile_shape >= NUMBER_OF_TILE_SHAPES){
+                    m_tile_shape = 0;
+                }
+            }
+        }
 
         if(m_view_mode == TileMode::Generation){
 

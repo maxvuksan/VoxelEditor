@@ -5,6 +5,7 @@ enum GenerationType{
 
     Shadow, // darkens by 1 step
     Overshadow, // sets all voxels to the darkest colour
+    Grass,
     Melt, 
     Roots, // placed on ceilings
     RootsChaotic,

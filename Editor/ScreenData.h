@@ -10,9 +10,21 @@
 #include "TileMaterial.h"
 #include "GenerationType.h"
 
+
+enum TileShape{
+    SOLID,
+    SLOPE_UPRIGHT,
+    SLOPE_UPLEFT,
+    SLOPE_DOWNRIGHT,
+    SLOPE_DOWNLEFT,
+
+    NUMBER_OF_TILE_SHAPES,
+};
+
 struct TileData{
     bool occupied = false;
     int tile_material_index = 0;
+
 
     int tile_object_index = -1;
     int voxel_object_index = -1; // no voxel material by default
@@ -25,6 +37,8 @@ struct TileData{
         }
     */
     int is_topleft_of_object = false; 
+
+    TileShape shape = SOLID;
 };
 
 struct VoxelData{
@@ -63,7 +77,7 @@ class ScreenData {
         sf::Vector3f m_flat_light_direction = sf::Vector3f(1.0,1.0, 1.5);
         sf::Uint32 m_shadow_lift = 0;
 
-        float perspective_constant = 0.0015f;
+        float perspective_constant = 0.5f;
 
 
         int m_tile_size;

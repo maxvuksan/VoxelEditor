@@ -3,6 +3,8 @@
 #include "Util.h"
 #include <filesystem>
 #include "ScreenData.h"
+#include "../System/Utility/Datafile.h"
+#include "Serilizer.h"
 
 std::vector<TileObject> AssetManager::m_tile_objects;
 std::vector<VoxelObject> AssetManager::m_voxel_objects;
@@ -103,6 +105,7 @@ void AssetManager::ConfigureGenerationEffects(){
 
     m_generation_effects.push_back({"Shadow", GenerationType::Shadow});
     m_generation_effects.push_back({"Overshadow", GenerationType::Overshadow});
+    m_generation_effects.push_back({"Grass", GenerationType::Grass});
     m_generation_effects.push_back({"Melt", GenerationType::Melt});
     m_generation_effects.push_back({"Roots", GenerationType::Roots});
     m_generation_effects.push_back({"Roots Chaotic", GenerationType::RootsChaotic});
@@ -133,6 +136,10 @@ void AssetManager::Destruct(){
 
 void AssetManager::SaveFinalRender(ScreenData& screen_data){
 
+    /*
+        Save Image
+    */
+
     sf::Image depth_image = screen_data.m_canvas_depth.getTexture().copyToImage();
     sf::Image final_image = screen_data.m_canvas.getTexture().copyToImage();
 
@@ -147,8 +154,7 @@ void AssetManager::SaveFinalRender(ScreenData& screen_data){
 
             if(current_colour.a != 0){
                 // in light
-                current_colour.b = 255;
-
+                current_colour.b = 0;
 
                 // projects the flat lightmap onto the depth of the geometry, gives a 3d feeling
                 sf::Vector2f depth_shifted_coordinate = Util::ShiftVertexOnPerspectiveAxis(sf::Vector2f(x, y), screen_data, depth * screen_data.perspective_constant, true, true);
@@ -158,8 +164,8 @@ void AssetManager::SaveFinalRender(ScreenData& screen_data){
 
 
                 // in shadow,
-                if(light_map_image.getPixel(depth_shifted_x, depth_shifted_y) != sf::Color::White || screen_data.m_raycasted_shadows.getPixel(x, y) != sf::Color::White){
-                    current_colour.b = 0;
+                if(screen_data.m_raycasted_shadows.getPixel(x, y) != sf::Color::White){
+                    light_map_image.setPixel(depth_shifted_x, depth_shifted_y, sf::Color::Black);
                 }
             }
 
@@ -171,6 +177,13 @@ void AssetManager::SaveFinalRender(ScreenData& screen_data){
     }
 
     final_image.saveToFile("LevelExports/export_main.png");
+    light_map_image.saveToFile("LevelExports/export_lightmap.png");
+    /*
+        Save additional render data
+    */
+
+    Serilizer::SaveRenderData("LevelExports/export_main.data", screen_data);
+
 }
 
 

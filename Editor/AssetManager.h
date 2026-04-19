@@ -40,9 +40,27 @@ class AssetManager {
         static void CreateVoxelObject(std::string material_name, std::string file_location, ScreenData& screen_data, bool draw_sides = false);
         static void CreateTileObject(std::string material_name, std::string file_location, ScreenData& screen_data);
 
-        static const TileMaterial& GetTileMaterial(int material_index){return m_tile_materials[material_index];}
-        static const TileObject& GetTileObject(int material_index){return m_tile_objects[material_index];}
-        static const VoxelObject& GetVoxelObject(int material_index){return m_voxel_objects[material_index];}
+        static TileMaterial* GetTileMaterial(int material_index){
+            if(material_index < 0 || material_index >= m_tile_materials.size()){
+                return nullptr;
+            } 
+            
+            return &m_tile_materials[material_index];
+        }
+        static TileObject* GetTileObject(int material_index){
+            if(material_index < 0 || material_index >= m_tile_objects.size()){
+                return nullptr;
+            } 
+            
+            return &m_tile_objects[material_index];
+        }
+        static VoxelObject* GetVoxelObject(int material_index){
+            if(material_index < 0 || material_index >= m_voxel_objects.size()){
+                return nullptr;
+            } 
+            
+            return &m_voxel_objects[material_index];
+        }
 
         static const std::vector<std::string>& GetAllTileMaterialNames(){return m_tile_materials_names;}
         static const std::vector<TileMaterial>& GetAllTileMaterials(){return m_tile_materials;}

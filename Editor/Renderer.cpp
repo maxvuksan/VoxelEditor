@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Util.h"
 #include "AssetManager.h"
+#include <random>
 
 NormalPreset Renderer::m_normal_dictionary[NUMBER_OF_FACES];
 sf::Image Renderer::m_spare_image;
@@ -184,13 +185,50 @@ void Renderer::CreateVoxelsFromRopes(ScreenData& screen_data){
 
 void Renderer::CreateVoxelFromTile(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer){
 
-    const TileMaterial& tile_material = AssetManager::GetTileMaterial(screen_data.m_tile_layers[tile_layer][tile_x][tile_y].tile_material_index);
+    TileMaterial* tile_material = AssetManager::GetTileMaterial(screen_data.m_tile_layers[tile_layer][tile_x][tile_y].tile_material_index);
 
     sf::Vector2i texture_position_to_sample;
 
     // create the voxels which would make up this tile
     for(int x = 0; x < screen_data.m_tile_size; x++){
         for(int y = 0; y < screen_data.m_tile_size; y++){
+
+            bool skipSet = false;
+
+            switch(screen_data.m_tile_layers[tile_layer][tile_x][tile_y].shape){
+
+                case TileShape::SOLID:
+                    break;
+
+                case TileShape::SLOPE_UPRIGHT:
+                    if(y + x <= screen_data.m_tile_size - 1){
+                        skipSet = true;
+                    }
+                    break;
+
+                case TileShape::SLOPE_DOWNRIGHT:
+                    if(y + x >= screen_data.m_tile_size - 1){
+                        skipSet = true;
+                    }
+                    break;
+
+                case TileShape::SLOPE_UPLEFT:
+                    if(y + (screen_data.m_tile_size - x) <= screen_data.m_tile_size - 1){
+                        skipSet = true;
+                    }
+                    break;
+
+                case TileShape::SLOPE_DOWNLEFT:
+                    if(y + (screen_data.m_tile_size - x) >= screen_data.m_tile_size - 1){
+                        skipSet = true;
+                    }
+                    break;
+            }
+
+            if(skipSet){
+                continue;
+            }
+
             for(int depth = 0; depth < screen_data.m_tile_depth; depth++){
 
                 int z = depth + (tile_layer * screen_data.m_tile_depth);
@@ -198,10 +236,10 @@ void Renderer::CreateVoxelFromTile(ScreenData& screen_data, int tile_x, int tile
                 int _x_canvas = x + tile_x * screen_data.m_tile_size;
                 int _y_canvas = y + tile_y * screen_data.m_tile_size;
                 
-                texture_position_to_sample = Util::PositionToTexturePosition(sf::Vector2i(_x_canvas, _y_canvas), *tile_material.image_texture, true, true);
+                texture_position_to_sample = Util::PositionToTexturePosition(sf::Vector2i(_x_canvas, _y_canvas), *tile_material->image_texture, true, true);
 
                 screen_data.m_voxel_space[z][_x_canvas][_y_canvas].occupied = true;
-                screen_data.m_voxel_space[z][_x_canvas][_y_canvas].normal_colour = tile_material.image_texture->getPixel(texture_position_to_sample.x, texture_position_to_sample.y);
+                screen_data.m_voxel_space[z][_x_canvas][_y_canvas].normal_colour = tile_material->image_texture->getPixel(texture_position_to_sample.x, texture_position_to_sample.y);
                 screen_data.m_voxel_space[z][_x_canvas][_y_canvas].draw_sides = true;
             }
         }
@@ -211,7 +249,7 @@ void Renderer::CreateVoxelFromTile(ScreenData& screen_data, int tile_x, int tile
 void Renderer::CreateVoxelFromVoxelObject(ScreenData& screen_data, int tile_x, int tile_y, int tile_layer){
 
 
-    const VoxelObject& voxel_material = AssetManager::GetVoxelObject(screen_data.m_tile_layers[tile_layer][tile_x][tile_y].voxel_object_index);
+    VoxelObject* voxel_material = AssetManager::GetVoxelObject(screen_data.m_tile_layers[tile_layer][tile_x][tile_y].voxel_object_index);
 
     sf::Color sampled_pixel;
 
@@ -219,14 +257,20 @@ void Renderer::CreateVoxelFromVoxelObject(ScreenData& screen_data, int tile_x, i
     int canvas_x = tile_x * screen_data.m_tile_size;
     int canvas_y = tile_y * screen_data.m_tile_size; 
 
-    for(int layer = 0; layer < voxel_material.layer_count; layer++){
-        for(int x = 0; x < voxel_material.layer_width; x++){
-            for(int y = 0; y < voxel_material.layer_height; y++){
+    for(int layer = 0; layer < voxel_material->layer_count; layer++){
+
+        // cut voxel overflow (object extends further than allowed voxel space)
+        if(z + layer >= screen_data.m_voxel_space.size()){
+            break;
+        }
+
+        for(int x = 0; x < voxel_material->layer_width; x++){
+            for(int y = 0; y < voxel_material->layer_height; y++){
                 
                 // move down with each layer
-                int texture_y = y + voxel_material.layer_height * (voxel_material.layer_count - layer - 1);
+                int texture_y = y + voxel_material->layer_height * (voxel_material->layer_count - layer - 1);
 
-                sampled_pixel = voxel_material.image_texture->getPixel(x, texture_y);
+                sampled_pixel = voxel_material->image_texture->getPixel(x, texture_y);
 
                 // no voxel at position
                 if(sampled_pixel == sf::Color::Transparent){
@@ -249,7 +293,7 @@ void Renderer::CreateVoxelFromTileObject(ScreenData& screen_data, int tile_x, in
     auto object_names = AssetManager::GetAllTileObjectNames();
 
     int voxel_object_index = screen_data.m_tile_layers[tile_layer][tile_x][tile_y].tile_object_index;
-    const TileObject& tile_object = AssetManager::GetTileObject(voxel_object_index);
+    TileObject* tile_object = AssetManager::GetTileObject(voxel_object_index);
 
     sf::Color sampled_pixel;
 
@@ -258,10 +302,10 @@ void Renderer::CreateVoxelFromTileObject(ScreenData& screen_data, int tile_x, in
     int canvas_y = tile_y * screen_data.m_tile_size; 
 
     for(int layer = 0; layer < screen_data.m_tile_depth; layer++){
-        for(int x = 0; x < tile_object.layer_width; x++){
-            for(int y = 0; y < tile_object.layer_height; y++){
+        for(int x = 0; x < tile_object->layer_width; x++){
+            for(int y = 0; y < tile_object->layer_height; y++){
                 
-                sampled_pixel = tile_object.image_texture->getPixel(x, y);
+                sampled_pixel = tile_object->image_texture->getPixel(x, y);
 
                 // no voxel at position
                 if(sampled_pixel == sf::Color::Transparent){
@@ -358,7 +402,7 @@ void Renderer::DrawVoxelLayer(ScreenData& screen_data, int y, int z_position, sf
                         vertex.color = screen_data.m_voxel_space[z_position][x][y].normal_colour;
                     }
                     else{
-                        vertex.color = m_normal_dictionary[FACE_FRONT].normal_colour;
+                        vertex.color = m_normal_dictionary[face_directions[i]].normal_colour;
                     }
 
                 }
@@ -793,9 +837,18 @@ void Renderer::ManipulateVoxelsThroughGeneration(ScreenData& screen_data){
                                 Generation_Shadow(screen_data, gen_canvas, x, y, z, percent);
                                 break;
                             }
+                            case Grass: {
+                                Generation_Grass(screen_data, gen_canvas, x, y, z, percent);
+                                break;
+                            }
+                            
                             case Melt:
                                 Generation_Melt(screen_data, gen_canvas, x, y, z, percent);
                                 break;
+
+                            
+
+
 
                             // roots
                             case Roots:
@@ -853,6 +906,109 @@ void Renderer::Generation_Overshadow(ScreenData& screen_data, sf::Image* gen_can
         }
         else{
             screen_data.m_voxel_space[z][x][y].normal_colour = m_normal_dictionary[FACE_BOTTOM].normal_colour;
+        }
+    }
+}
+
+void Renderer::GenerateGrassBlade(ScreenData& screen_data, int x, int y, int z, int stepCount, sf::Vector2f direction){
+
+    float new_x = x;
+    float new_y = y;
+
+    sf::Vector2f offsets[4] = {sf::Vector2f(0,0), sf::Vector2f(0,1), sf::Vector2f(1,0), sf::Vector2f(1,1)};
+
+
+    if(rand() % 100 < 25){
+        stepCount++;
+    }
+
+    for(int i = 0; i < stepCount; i++){
+
+        new_x += direction.x;
+        new_y += direction.y;
+
+        int rounded_x = round(new_x);
+        int rounded_y = round(new_y);
+
+        for(int o = 0; o < 4; o++){
+
+            // make tip smaller
+            if(i == stepCount - 1 && o > 0){
+                break;
+            }
+
+            if(Util::InCanvasBounds(screen_data, rounded_x + offsets[o].x, rounded_y + offsets[o].y)){
+
+                screen_data.m_voxel_space[z][rounded_x + offsets[o].x][rounded_y + offsets[o].y].occupied = true;
+                screen_data.m_voxel_space[z][rounded_x + offsets[o].x][rounded_y + offsets[o].y].normal_colour = m_normal_dictionary[FACE_FRONT].normal_colour;
+                screen_data.m_voxel_space[z][rounded_x + offsets[o].x][rounded_y + offsets[o].y].draw_sides = false;
+                screen_data.m_voxel_space[z][rounded_x + offsets[o].x][rounded_y + offsets[o].y].modified_by_generation = true;
+            }
+        }
+
+
+    }
+
+
+}
+
+void Renderer::Generation_Grass(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent){
+    
+    double noise_val = m_perlin.octave3D_01(x * 0.16, y * 0.16, z * 0.15, 4, 0.5);
+
+    percent *= noise_val;
+
+    if(z % 2 != 0){
+        return;
+    }
+
+    if(screen_data.m_voxel_space[z][x][y].occupied && !screen_data.m_voxel_space[z][x][y].modified_by_generation){
+        if(percent > 0.5){
+            
+            sf::Vector2f growthRange;
+            int bladeLength = 2;
+
+            // above
+            if(Util::InCanvasBounds(screen_data, x, y - 1) && !screen_data.m_voxel_space[z][x][y - 1].occupied){
+                
+                float x_dir = Util::Random(-0.4f, 0.4f);
+                float y_dir = -1.0 - Util::Random(0, 0.3);
+
+                GenerateGrassBlade(screen_data, x, y, z, bladeLength, sf::Vector2f(x_dir, y_dir));
+            }
+
+            if(Util::InCanvasBounds(screen_data, x, y + 1) && !screen_data.m_voxel_space[z][x][y + 1].occupied){
+                
+                float x_dir = Util::Random(-0.4, 0.4);
+                float y_dir = 1.0 - Util::Random(0, 0.3);
+
+                GenerateGrassBlade(screen_data, x, y, z, bladeLength, sf::Vector2f(x_dir, y_dir));
+            }
+
+            if(Util::InCanvasBounds(screen_data, x - 1, y) && !screen_data.m_voxel_space[z][x - 1][y].occupied){
+                
+                float x_dir = -1.0 + Util::Random(0, 0.3); 
+                float y_dir = Util::Random(-0.4, 0.4);
+
+                GenerateGrassBlade(screen_data, x, y, z, bladeLength, sf::Vector2f(x_dir, y_dir));
+            }
+            if(Util::InCanvasBounds(screen_data, x + 1, y) && !screen_data.m_voxel_space[z][x + 1][y].occupied){
+                
+                float x_dir = 1.0 - Util::Random(0, 0.3); 
+                float y_dir = Util::Random(-0.4, 0.4);
+
+                GenerateGrassBlade(screen_data, x, y, z, bladeLength, sf::Vector2f(x_dir, y_dir));
+            }
+
+            // dont melt air 
+            if(!screen_data.m_voxel_space[z][x][y].occupied){
+                return;
+            }
+    
+        }
+        else if(percent < 0.15){
+            screen_data.m_voxel_space[z][x][y].occupied = false;
+            screen_data.m_voxel_space[z][x][y].modified_by_generation = true;
         }
     }
 }

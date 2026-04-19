@@ -70,4 +70,87 @@ void Serilizer::OpenSaveFile(){
     HINSTANCE result = ShellExecuteA(NULL, "open", "Output", NULL, NULL, SW_SHOWNORMAL);
 }
 
+void Serilizer::SaveRenderData(std::string saveFile, ScreenData& screen_data){
+
+    Datafile data;
+    //data["colliders"][0]
+
+    struct Polygon{
+        std::vector<sf::Vector2f> verts;
+    };
+
+    std::vector<Polygon> polygons;
+
+    for(int x = 0; x < screen_data.m_tile_layers.at(0).size(); x++){
+        for(int y = 0; y < screen_data.m_tile_layers.at(0).at(0).size(); y++){
+
+            if(!screen_data.m_tile_layers[0][x][y].occupied){
+                continue;
+            }
+
+            Polygon tilePoly;
+
+            switch(screen_data.m_tile_layers[0][x][y].shape){
+
+                case TileShape::SOLID: {
+                    // construct square for tile
+                    tilePoly.verts.push_back(sf::Vector2f(x, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y + 1));
+                    tilePoly.verts.push_back(sf::Vector2f(x, y + 1));
+                    break;
+                }
+                case TileShape::SLOPE_UPRIGHT: {
+                    tilePoly.verts.push_back(sf::Vector2f(x, y + 1));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y + 1));
+                    break;
+                }
+            
+                case TileShape::SLOPE_UPLEFT: {
+                    tilePoly.verts.push_back(sf::Vector2f(x, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y + 1));
+                    tilePoly.verts.push_back(sf::Vector2f(x, y + 1));
+                    break;
+                }
+                case TileShape::SLOPE_DOWNRIGHT: {
+                    tilePoly.verts.push_back(sf::Vector2f(x, y + 1));
+                    tilePoly.verts.push_back(sf::Vector2f(x, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y));
+                    break;
+                }
+                case TileShape::SLOPE_DOWNLEFT: {
+                    tilePoly.verts.push_back(sf::Vector2f(x, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y));
+                    tilePoly.verts.push_back(sf::Vector2f(x + 1, y + 1));
+                    break;
+                }                
+            }
+
+
+            polygons.push_back(tilePoly);
+
+        }
+    }
+
+
+    for(int i = 0; i < polygons.size(); i++){
+
+        int vIndex = 0;
+        for(auto& vert : polygons[i].verts){
+
+            data["colliders"][std::to_string(i)].SetInt(vert.x * screen_data.m_tile_size, vIndex);
+            vIndex++;
+            data["colliders"][std::to_string(i)].SetInt(vert.y * screen_data.m_tile_size, vIndex);
+            vIndex++;
+        }
+    }
+
+
+
+
+
+
+    Datafile::Write(data, saveFile);
+}
 

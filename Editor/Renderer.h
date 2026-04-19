@@ -73,6 +73,9 @@ class Renderer {
 
         static void Generation_Shadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
         static void Generation_Overshadow(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
+        static void Generation_Grass(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
+        static void GenerateGrassBlade(ScreenData& screen_data, int x, int y, int z, int stepCount, sf::Vector2f direction);
+
         static void Generation_Melt(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent);
         static void Generation_Roots(ScreenData& screen_data, sf::Image* gen_canvas, int x, int y, int z, float percent, bool CHAOS, bool THICK);
 

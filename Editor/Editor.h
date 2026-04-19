@@ -50,12 +50,14 @@ class Editor : public Core {
         void DrawEditor();
         void DrawEditorText();
 
-        void SetTileOccupied(int x, int y, bool occupied);
+        void SetTileOccupied(int x, int y, bool occupied, TileShape shape);
 
+        void AppendTileShapeVerticies(sf::VertexArray& va, float x, float y, TileShape shape, sf::Color colour = sf::Color::White);
         // for TileMode == Tiles
         void DrawTileGuides(sf::RenderTarget& surface);
         // for TileMode == Material
         void DrawMaterialGuides(sf::RenderTarget& surface, bool draw_material_nodes = true);
+
 
         void DrawRopeGuides(sf::RenderTarget& surface, bool only_draw = false);
 
@@ -111,6 +113,7 @@ class Editor : public Core {
 
         int m_view_mode;
         TileTool m_tile_tool;
+        int m_tile_shape; // solid, slope etc...
         bool m_symmetric_x = false;
         bool m_symmetric_y = false;
 
