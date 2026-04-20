@@ -1,8 +1,8 @@
 # Voxel Editor
 
-## A level editor which prerenders voxel enviroments to images.
+A level editor which prerenders voxel enviroments to images.
 
-#### The editor is comprised of 6 stages
+`The editor is comprised of 6 stages`
 
 **Tiles** Define tiles to make up the geometry of the level.
 
@@ -16,7 +16,7 @@
 
 **Render** Compute the final image.
 
-#### The level can then be previewed with a selected palette, the palette is made up of lit colours, in shadow colours and fog/background colour.
+`The level can then be previewed with a selected palette, the palette is made up of lit colours, in shadow colours and fog/background colour.`
 
 ![Render Screenshot](/example2.png)
 ![Render Screenshot](/example3.png)
