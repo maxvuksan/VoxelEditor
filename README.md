@@ -3,7 +3,7 @@
 A level editor which prerenders voxel enviroments to images.
 
 
-## The Pipeline
+### The Pipeline
 The editor is comprised of 6 distinct stages:
 
 🧱 Tiles – Define the base tiles that make up the core geometry of the level.
