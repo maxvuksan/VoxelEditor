@@ -5,17 +5,17 @@ A level editor which prerenders voxel enviroments to images.
 
 The editor is comprised of 6 stages:
 
- **Tiles** Define tiles to make up the geometry of the level.
+ **Tiles**      Define tiles to make up the geometry of the level.
  
- **Material** Place materials and voxel meshes on said geometry.
+ **Material**   Place materials and voxel meshes on said geometry.
  
- **Rope** Place ropes (defined as Bezier Curves) between points.
+ **Rope**       Place ropes (defined as Bezier Curves) between points.
  
  **Generation** Paint generative effects to be applied to the defined voxel geometry.
  
- **Light** Paint light sprites to represent lit and unlit regions of the level.
+ **Light**      Paint light sprites to represent lit and unlit regions of the level.
  
- **Render** Compute the final image.
+ **Render**     Compute the final image.
 
 ![Render Screenshot](/example2.png)
 ![Render Screenshot](/example3.png)
